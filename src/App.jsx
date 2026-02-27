@@ -143,10 +143,13 @@ function Card({ children, className = "" }) {
 }
 
 export default function App() {
-  // ===== ALL HOOKS DECLARED UNCONDITIONALLY AT THE TOP =====
+  // ===== ALL HOOKS MUST BE DECLARED BEFORE ANY CONDITIONAL RETURNS =====
+  // Password gate
   const [authed, setAuthed] = useState(false);
   const [pw, setPw] = useState('');
   const [pwErr, setPwErr] = useState(false);
+
+  // Calculator state — these MUST run on every render (React rules of hooks)
   const [scores, setScores] = useState({});
   const [scope, setScope] = useState(null);
   const [time, setTime] = useState(null);
@@ -167,6 +170,8 @@ export default function App() {
   const [manualDiscount, setManualDiscount] = useState(0);
   const [showDiscounts, setShowDiscounts] = useState(false);
 
+  // ===== NOW safe to do conditional return =====
+
   const handleLogin = () => {
     if (pw === import.meta.env.VITE_APP_PASSWORD) {
       setAuthed(true);
@@ -176,7 +181,33 @@ export default function App() {
     }
   };
 
+  if (!authed) return (
+    <div className="min-h-screen bg-black flex items-center justify-center">
+      <div className="bg-gray-900 border border-gray-700 rounded-2xl p-10 w-full max-w-sm text-center">
+        <div className="flex items-center justify-center gap-2 mb-8">
+          <DelegateLogo />
+          <span className="text-lg font-black tracking-tight text-white">Delegate</span>
+        </div>
+        <h1 className="text-white font-bold text-lg mb-1">Pricing Calculator</h1>
+        <p className="text-gray-500 text-xs mb-6">Internal use only</p>
+        <input type="password" placeholder="Enter team password" value={pw}
+          onChange={e => setPw(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && handleLogin()}
+          className={`w-full bg-gray-800 border rounded-lg px-4 py-3 text-white text-sm text-center focus:outline-none mb-3 ${pwErr ? 'border-red-500' : 'border-gray-600 focus:border-yellow-500'}`}
+        />
+        {pwErr && <p className="text-red-400 text-xs mb-3">Incorrect password. Try again.</p>}
+        <button onClick={handleLogin} className="w-full py-3 rounded-lg font-semibold text-sm text-black transition-all"
+          style={{ backgroundColor: '#F59E0B' }}>
+          Enter
+        </button>
+      </div>
+    </div>
+  );
+
+  // ===== Calculator logic (only runs when authed) =====
+
   const setScore = (id, val) => setScores(s => ({ ...s, [id]: val }));
+
   const allScored = PILLARS.every(p => scores[p.id]);
   const matrixCell = scope && time ? MATRIX.find(m => m.scope === scope && m.time === time) : null;
   const engType = matrixCell?.eng;
@@ -186,12 +217,14 @@ export default function App() {
   const isExecution = engType === "execution";
   const isProject = isIdeation || isExecution;
   const isRetainer = isOp || isSt;
+
   const freeMonthEligible = isRetainer && (commitTerm === "6mo" || commitTerm === "12mo");
   const needsConnector = ["presence","clarity"].some(p => scores[p]==="M"||scores[p]==="H");
   const amplifierDepth = ["strategicGuidance","championing"].filter(p => scores[p]==="H").length;
 
   const getOpTier = () => needsConnector ? (numBuilders > 1 ? OP_TIERS[2] : OP_TIERS[1]) : OP_TIERS[0];
   const getStTier = () => amplifierDepth >= 2 ? ST_TIERS[2] : amplifierDepth === 1 ? ST_TIERS[1] : ST_TIERS[0];
+
   const recTier = isOp ? getOpTier() : isSt ? getStTier() : null;
   const avgMult = allScored ? PILLARS.reduce((s,p) => s + MULT[scores[p.id]], 0) / PILLARS.length : null;
 
@@ -231,6 +264,7 @@ export default function App() {
   const newClientDisc = newClient ? newClientPct / 100 : 0;
   const volDisc = isRetainer ? (VOLUME_DISCOUNTS.find(v => totalHrs >= v.min && totalHrs <= v.max)?.pct || 0) : 0;
   const manualDisc = manualDiscount / 100;
+
   const pctDiscTotal = commitDiscPct + newClientDisc + volDisc + manualDisc;
   const monthlyAfterPctDisc = monthlyInv * (1 - pctDiscTotal);
   const termMonths = COMMIT_TERMS[commitTerm] || 1;
@@ -239,14 +273,16 @@ export default function App() {
   const effectiveBlendedRate = isRetainer && commitTerm !== "none" && termHrsDelivered > 0
     ? Math.round(termRevenue / termHrsDelivered)
     : Math.round(monthlyAfterPctDisc / (totalHrs || 1));
+
   const finalMonthly = Math.round(monthlyAfterPctDisc / 100) * 100;
   const finalTermTotal = isRetainer && commitTerm !== "none" ? Math.round(termRevenue / 100) * 100 : null;
   const discountEquivPct = blendedRate > 0 ? 1 - (effectiveBlendedRate / blendedRate) : 0;
   const needsApproval = (pctDiscTotal > MAX_AUTO_DISCOUNT) || (useFreeMonth && discountEquivPct > MAX_AUTO_DISCOUNT);
+
   const clientTierLabel = recTier?.label || (isIdeation ? "Ideation" : isExecution ? "Execution Project" : null);
   const clientTierColor = recTier?.color || (isIdeation ? "#7C5CBF" : isExecution ? "#2A9D6A" : B.textDim);
 
-  // ===== AI SCORING — now calls serverless API route instead of Anthropic directly =====
+  // FIX: Route AI call through Vercel serverless function instead of direct Anthropic API
   const analyzeWithAI = async () => {
     if (!accountText.trim()) return;
     setAnalyzing(true);
@@ -255,13 +291,24 @@ export default function App() {
       const res = await fetch("/api/analyze", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ accountText }),
+        body: JSON.stringify({ accountText: accountText.trim() }),
       });
-      const p = await res.json();
-      if (p.error) throw new Error(p.error);
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "API request failed");
+      }
+
+      const text = data.content?.find(b => b.type === "text")?.text || "";
+      const p = JSON.parse(text.replace(/```json|```/g, "").trim());
+
       setScores({
-        presence: p.presence, clarity: p.clarity, predictability: p.predictability,
-        driveValue: p.driveValue, strategicGuidance: p.strategicGuidance, championing: p.championing,
+        presence: p.presence,
+        clarity: p.clarity,
+        predictability: p.predictability,
+        driveValue: p.driveValue,
+        strategicGuidance: p.strategicGuidance,
+        championing: p.championing,
       });
       if (p.scope) setScope(p.scope);
       if (p.time) setTime(p.time);
@@ -276,17 +323,18 @@ export default function App() {
       if (p.riskBuffer) setRiskBuffer(p.riskBuffer);
       if (p.summary) setAiSummary(p.summary);
     } catch(e) {
-      setAiSummary("Could not analyze — try again or complete fields manually.");
+      setAiSummary("Could not analyze — " + (e.message || "try again or complete fields manually."));
     }
     setAnalyzing(false);
   };
 
   const reset = () => {
-    setScores({}); setScope(null); setTime(null); setDuration(4); setNumBuilders(1);
-    setAccountText(""); setAiSummary(""); setExBuilderHrs(80); setExConnectorHrs(20);
-    setExAmplifierHrs(0); setShowAmplifier(false); setRiskBuffer("Medium");
-    setCommitTerm("none"); setCommitIncentive("pct"); setNewClient(false);
-    setNewClientPct(5); setManualDiscount(0); setShowDiscounts(false);
+    setScores({}); setScope(null); setTime(null); setDuration(4);
+    setNumBuilders(1); setAccountText(""); setAiSummary("");
+    setExBuilderHrs(80); setExConnectorHrs(20); setExAmplifierHrs(0);
+    setShowAmplifier(false); setRiskBuffer("Medium"); setCommitTerm("none");
+    setCommitIncentive("pct"); setNewClient(false); setNewClientPct(5);
+    setManualDiscount(0); setShowDiscounts(false);
   };
 
   const selBtn = (active, color) => ({
@@ -296,30 +344,6 @@ export default function App() {
     transition: "all 0.15s",
   });
 
-  // ===== PASSWORD GATE (after all hooks) =====
-  if (!authed) return (
-    <div className="min-h-screen bg-black flex items-center justify-center">
-      <div className="bg-gray-900 border border-gray-700 rounded-2xl p-10 w-full max-w-sm text-center">
-        <div className="flex items-center justify-center gap-2 mb-8">
-          <DelegateLogo />
-          <span className="text-lg font-black tracking-tight" style={{ color: B.gold }}>Delegate</span>
-        </div>
-        <h1 className="text-white font-bold text-lg mb-1">Pricing Calculator</h1>
-        <p className="text-gray-500 text-xs mb-6">Internal use only</p>
-        <input type="password" placeholder="Enter team password" value={pw}
-          onChange={e => setPw(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && handleLogin()}
-          className={`w-full bg-gray-800 border rounded-lg px-4 py-3 text-white text-sm text-center focus:outline-none mb-3 ${pwErr ? 'border-red-500' : 'border-gray-600 focus:border-yellow-500'}`} />
-        {pwErr && <p className="text-red-400 text-xs mb-3">Incorrect password. Try again.</p>}
-        <button onClick={handleLogin} className="w-full py-3 rounded-lg font-semibold text-sm text-black transition-all"
-          style={{ backgroundColor: '#F59E0B' }}>
-          Enter
-        </button>
-      </div>
-    </div>
-  );
-
-  // ===== MAIN CALCULATOR UI =====
   return (
     <div className="min-h-screen font-sans" style={{ background: B.bg, color: B.text }}>
       <div style={{ borderBottom: `1px solid ${B.border2}`, background: B.surface }} className="px-6 py-4">
@@ -377,6 +401,7 @@ export default function App() {
               <h2 className="font-semibold text-white">What Does Devon Value?</h2>
             </div>
             <p className="text-xs mb-4 ml-8" style={{ color: B.textDim }}>Two questions place Devon in the right engagement.</p>
+
             <div className="mb-3">
               <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: B.textMuted }}>Scope of work</div>
               <div className="grid grid-cols-2 gap-2">
@@ -388,6 +413,7 @@ export default function App() {
                 ))}
               </div>
             </div>
+
             <div className="mb-4">
               <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: B.textMuted }}>Engagement horizon</div>
               <div className="grid grid-cols-2 gap-2">
@@ -399,6 +425,7 @@ export default function App() {
                 ))}
               </div>
             </div>
+
             <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${B.border2}` }}>
               <div className="grid grid-cols-3 text-xs">
                 <div style={{ background: B.surface2 }} className="p-2"></div>
@@ -419,6 +446,7 @@ export default function App() {
                 ])}
               </div>
             </div>
+
             {isOp && (
               <div className="mt-4 pt-4" style={{ borderTop: `1px solid ${B.border2}` }}>
                 <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: B.textMuted }}>Number of Builders</div>
@@ -427,6 +455,7 @@ export default function App() {
                 ))}</div>
               </div>
             )}
+
             {isIdeation && (
               <div className="mt-4 pt-4" style={{ borderTop: `1px solid ${B.border2}` }}>
                 <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: B.textMuted }}>Duration (sprint-aligned)</div>
@@ -435,13 +464,15 @@ export default function App() {
                 ))}</div>
               </div>
             )}
+
             {isExecution && (
               <div className="mt-4 pt-4" style={{ borderTop: `1px solid ${B.border2}` }}>
                 <div className="text-xs font-semibold uppercase tracking-wide mb-3" style={{ color: B.textMuted }}>Estimated Implementation Hours</div>
                 <HrsInput label="Builder" value={exBuilderHrs} onChange={setExBuilderHrs} rate={RATES.builderEx} color={ROLE_COLORS.Builder}/>
                 <HrsInput label="Connector" value={exConnectorHrs} onChange={setExConnectorHrs} rate={RATES.connector} color={ROLE_COLORS.Connector}/>
                 <button onClick={() => { setShowAmplifier(!showAmplifier); if(showAmplifier) setExAmplifierHrs(0); }}
-                  className="w-full py-2 rounded-lg text-xs font-semibold transition-all mb-2" style={selBtn(showAmplifier, B.orange)}>
+                  className="w-full py-2 rounded-lg text-xs font-semibold transition-all mb-2"
+                  style={selBtn(showAmplifier, B.orange)}>
                   {showAmplifier ? "− Remove Amplifier" : "+ Add Amplifier (optional)"}
                 </button>
                 {showAmplifier && <HrsInput label="Amplifier" value={exAmplifierHrs} onChange={setExAmplifierHrs} rate={RATES.amplifier} color={ROLE_COLORS.Amplifier}/>}
@@ -472,7 +503,8 @@ export default function App() {
                 <StepBadge n="4" />
                 <h2 className="font-semibold text-white">Discounts & Incentives</h2>
                 {(pctDiscTotal>0||useFreeMonth) && (
-                  <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: "#14532D44", border: "1px solid #166534", color: "#4ADE80" }}>
+                  <span className="text-xs px-2 py-0.5 rounded-full"
+                    style={{ background: "#14532D44", border: "1px solid #166534", color: "#4ADE80" }}>
                     {useFreeMonth?"1 free month":""}{useFreeMonth&&pctDiscTotal>0?" + ":""}{pctDiscTotal>0?`−${(pctDiscTotal*100).toFixed(0)}%`:""} applied
                   </span>
                 )}
@@ -480,6 +512,7 @@ export default function App() {
               </div>
               <span className="text-xs" style={{ color: B.textDim }}>{showDiscounts?"▲":"▼"}</span>
             </button>
+
             {showDiscounts && (
               <div className="mt-4 space-y-5">
                 <div>
@@ -499,7 +532,8 @@ export default function App() {
                       <div className="grid grid-cols-2 gap-2">
                         {[["pct","% Discount", commitTerm==="6mo"?"8% off monthly rate":"12% off monthly rate"],
                           ["freemonth","1 Free Month", commitTerm==="6mo"?"Pay 5, get 6":"Pay 11, get 12"]].map(([v,l,s]) => (
-                          <button key={v} onClick={() => setCommitIncentive(v)} className="rounded-lg p-3 text-left transition-all" style={selBtn(commitIncentive===v, "#4ADE80")}>
+                          <button key={v} onClick={() => setCommitIncentive(v)}
+                            className="rounded-lg p-3 text-left transition-all" style={selBtn(commitIncentive===v, "#4ADE80")}>
                             <div className="font-semibold text-sm">{l}</div>
                             <div className="text-xs mt-0.5" style={{ color: B.textDim }}>{s}</div>
                           </button>
@@ -508,6 +542,7 @@ export default function App() {
                     </div>
                   )}
                 </div>
+
                 <div>
                   <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: B.textMuted }}>New Client Discount</div>
                   <div className="flex items-center gap-3">
@@ -525,6 +560,7 @@ export default function App() {
                     )}
                   </div>
                 </div>
+
                 {isRetainer && (
                   <div>
                     <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: B.textMuted }}>Volume Discount <span style={{ color: B.textDim, textTransform:"none", fontWeight:"normal" }}>(auto-applied)</span></div>
@@ -539,6 +575,7 @@ export default function App() {
                     })}</div>
                   </div>
                 )}
+
                 <div>
                   <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: B.textMuted }}>Manual Override %</div>
                   <div className="flex items-center gap-3">
@@ -549,6 +586,7 @@ export default function App() {
                     <span className="text-xs" style={{ color: B.textMuted }}>% additional discount</span>
                   </div>
                 </div>
+
                 {needsApproval && (
                   <div className="p-3 rounded-lg" style={{ background: B.orange+"18", border: `1px solid ${B.orange}55` }}>
                     <div className="text-xs font-bold mb-1" style={{ color: B.orange }}>⚠ Manager Approval Required</div>
@@ -563,7 +601,6 @@ export default function App() {
           </div>
         </div>
 
-        {/* ===== RIGHT COLUMN: PRICING OUTPUT ===== */}
         <div className="lg:sticky lg:top-4 lg:self-start">
           <div className="rounded-xl p-5" style={{ background: B.surface, border: `1px solid ${B.border2}` }}>
             <h2 className="font-semibold text-white mb-4 flex items-center gap-2">
