@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
+import React from "react";
 
 const B = {
   gold: "#E8A020", orange: "#D4501A", teal: "#1A7A8A", lightBlue: "#4AAFC0",
@@ -29,12 +30,20 @@ const VOLUME_DISCOUNTS = [
 ];
 const MAX_AUTO_DISCOUNT = 0.10;
 
-const MATRIX = [
-  { scope: "defined", time: "timebound", eng: "execution", label: "Execution", color: "#2A9D6A", desc: "Deliver X by Y date", value: "Predictability & Accountability" },
-  { scope: "flexible", time: "timebound", eng: "ideation", label: "Ideation", color: "#7C5CBF", desc: "Clarity before commitment", value: "Clarity & Confidence" },
-  { scope: "defined", time: "ongoing", eng: "operational", label: "Operational", color: B.gold, desc: "Hands-on day-to-day relief", value: "Capacity & Reliability" },
-  { scope: "flexible", time: "ongoing", eng: "strategic", label: "Strategic", color: B.teal, desc: "Build toward roadmap as priorities evolve", value: "Flexibility & Momentum" },
-];
+// Updated engagement matrix
+const getEngagement = (scope, time) => {
+  if (!scope || !time || scope === "unknown" || time === "unknown") {
+    return { eng: "ideation", label: "Ideation", color: "#7C5CBF", desc: "Clarity before commitment", value: "Clarity & Confidence" };
+  }
+  if (scope === "defined" && time === "timebound") {
+    return { eng: "execution", label: "Execution", color: "#2A9D6A", desc: "Deliver X by Y date", value: "Predictability & Accountability" };
+  }
+  if (scope === "flexible" && time === "timebound") {
+    return { eng: "operational", label: "Operational", color: B.gold, desc: "Hands-on day-to-day relief", value: "Capacity & Reliability" };
+  }
+  // defined+ongoing, flexible+ongoing
+  return { eng: "strategic", label: "Strategic", color: B.teal, desc: "Build toward roadmap as priorities evolve", value: "Flexibility & Momentum" };
+};
 
 const OP_TIERS = [
   { id: "execute", label: "Execute", desc: "Reliable embedded execution", color: B.gold },
@@ -71,19 +80,16 @@ const higherScore = (a, b) => {
 };
 
 const DelegateLogo = () => (
-  <svg width="32" height="32" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <svg width="32" height="32" viewBox="0 0 100 100" fill="none">
     <polygon points="50,5 95,27.5 95,72.5 50,95 5,72.5 5,27.5" fill="none" stroke="#2A2A2A" strokeWidth="2"/>
     <polygon points="50,15 85,32.5 85,67.5 50,85 15,67.5 15,32.5" fill="none" stroke="#333" strokeWidth="1"/>
     <line x1="50" y1="5" x2="50" y2="95" stroke={B.teal} strokeWidth="3" opacity="0.6"/>
     <line x1="5" y1="27.5" x2="95" y2="72.5" stroke={B.gold} strokeWidth="3" opacity="0.6"/>
     <line x1="95" y1="27.5" x2="5" y2="72.5" stroke={B.orange} strokeWidth="3" opacity="0.6"/>
     <circle cx="50" cy="50" r="8" fill={B.gold} opacity="0.9"/>
-    <circle cx="50" cy="5" r="4" fill={B.teal}/>
-    <circle cx="95" cy="27.5" r="4" fill={B.lightBlue}/>
-    <circle cx="95" cy="72.5" r="4" fill={B.gold}/>
-    <circle cx="50" cy="95" r="4" fill={B.orange}/>
-    <circle cx="5" cy="72.5" r="4" fill={B.orange}/>
-    <circle cx="5" cy="27.5" r="4" fill={B.teal}/>
+    <circle cx="50" cy="5" r="4" fill={B.teal}/><circle cx="95" cy="27.5" r="4" fill={B.lightBlue}/>
+    <circle cx="95" cy="72.5" r="4" fill={B.gold}/><circle cx="50" cy="95" r="4" fill={B.orange}/>
+    <circle cx="5" cy="72.5" r="4" fill={B.orange}/><circle cx="5" cy="27.5" r="4" fill={B.teal}/>
   </svg>
 );
 
@@ -120,8 +126,17 @@ function PillarCard({ pillar, value, onChange }) {
 }
 
 function HrsTypeInput({ label, value, onChange, rate, color, recommended, breakdownLabel }) {
+  const [localVal, setLocalVal] = useState(String(value));
   const diff = recommended !== undefined ? value - recommended : 0;
   const hasDiff = recommended !== undefined && diff !== 0;
+
+  // Sync local display when value changes externally (e.g. reset, pillar change)
+  const prevVal = React.useRef(value);
+  if (prevVal.current !== value && String(value) !== localVal) {
+    setLocalVal(String(value));
+  }
+  prevVal.current = value;
+
   return (
     <div className="rounded-lg px-3 py-2 mb-2" style={{ background: B.surface2 }}>
       <div className="flex items-center justify-between">
@@ -133,8 +148,18 @@ function HrsTypeInput({ label, value, onChange, rate, color, recommended, breakd
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <input type="number" min={0} max={999} value={value}
-            onChange={e => onChange(Math.max(0, parseInt(e.target.value) || 0))}
+          <input type="number" min={0} max={999} value={localVal}
+            onChange={e => {
+              setLocalVal(e.target.value);
+              const parsed = parseInt(e.target.value);
+              if (!isNaN(parsed)) onChange(Math.max(0, parsed));
+            }}
+            onBlur={() => {
+              const parsed = parseInt(localVal);
+              if (isNaN(parsed) || localVal === "") {
+                setLocalVal(String(value));
+              }
+            }}
             className="w-16 rounded-md px-2 py-1 text-sm text-white text-center font-bold focus:outline-none"
             style={{ background: B.surface, border: `1px solid ${hasDiff ? B.gold+"88" : B.border2}` }} />
           <span className="text-xs" style={{ color: B.textDim }}>hrs</span>
@@ -164,19 +189,14 @@ function Card({ children, className="" }) {
 }
 
 export default function App() {
-  // ALL HOOKS BEFORE ANY CONDITIONAL RETURN (React rules of hooks)
-  const [authed, setAuthed] = useState(false);
-  const [pw, setPw] = useState('');
-  const [pwErr, setPwErr] = useState(false);
-
   const [scores, setScores] = useState({});
   const [scope, setScope] = useState(null);
   const [time, setTime] = useState(null);
   const [duration, setDuration] = useState(4);
   const [numBuilders, setNumBuilders] = useState(1);
   const [accountText, setAccountText] = useState("");
-  const [analyzing, setAnalyzing] = useState(false);
-  const [aiSummary, setAiSummary] = useState("");
+  const [uploadedFile, setUploadedFile] = useState(null);
+  const [uploadedFileName, setUploadedFileName] = useState("");
 
   const [manBuilderHrs, setManBuilderHrs] = useState(null);
   const [manConnectorHrs, setManConnectorHrs] = useState(null);
@@ -195,44 +215,12 @@ export default function App() {
   const [manualDiscount, setManualDiscount] = useState(0);
   const [showDiscounts, setShowDiscounts] = useState(false);
 
-  // Password gate
-  const handleLogin = () => {
-    if (pw === import.meta.env.VITE_APP_PASSWORD) {
-      setAuthed(true);
-    } else {
-      setPwErr(true);
-      setTimeout(() => setPwErr(false), 2000);
-    }
-  };
-
-  if (!authed) return (
-    <div className="min-h-screen bg-black flex items-center justify-center">
-      <div className="bg-gray-900 border border-gray-700 rounded-2xl p-10 w-full max-w-sm text-center">
-        <div className="flex items-center justify-center gap-2 mb-8">
-          <DelegateLogo />
-          <span className="text-lg font-black tracking-tight text-white">Delegate</span>
-        </div>
-        <h1 className="text-white font-bold text-lg mb-1">Pricing Calculator</h1>
-        <p className="text-gray-500 text-xs mb-6">Internal use only</p>
-        <input type="password" placeholder="Enter team password" value={pw}
-          onChange={e => setPw(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && handleLogin()}
-          className={`w-full bg-gray-800 border rounded-lg px-4 py-3 text-white text-sm text-center focus:outline-none mb-3 ${pwErr ? 'border-red-500' : 'border-gray-600 focus:border-yellow-500'}`}
-        />
-        {pwErr && <p className="text-red-400 text-xs mb-3">Incorrect password. Try again.</p>}
-        <button onClick={handleLogin} className="w-full py-3 rounded-lg font-semibold text-sm text-black transition-all"
-          style={{ backgroundColor: '#F59E0B' }}>
-          Enter
-        </button>
-      </div>
-    </div>
-  );
-
-  // Calculator logic
   const setScore = (id, val) => setScores(s => ({ ...s, [id]: val }));
   const allScored = PILLARS.every(p => scores[p.id]);
-  const matrixCell = scope && time ? MATRIX.find(m => m.scope===scope && m.time===time) : null;
-  const engType = matrixCell?.eng;
+
+  // Engagement type from matrix
+  const engCell = (scope && time) ? getEngagement(scope, time) : null;
+  const engType = engCell?.eng;
   const isOp = engType==="operational", isSt = engType==="strategic";
   const isIdeation = engType==="ideation", isExecution = engType==="execution";
   const isProject = isIdeation||isExecution, isRetainer = isOp||isSt;
@@ -315,55 +303,73 @@ export default function App() {
   if (pctDiscTotal > 0) discountParts.push(`−${(pctDiscTotal*100).toFixed(0)}%`);
   const discountBadgeText = discountParts.join(" + ");
 
-  // AI scoring via serverless function
-  const analyzeWithAI = async () => {
-    if (!accountText.trim()) return;
-    setAnalyzing(true);
-    setAiSummary("");
-    try {
-      const res = await fetch("/api/analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ accountText: accountText.trim() }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "API request failed");
-      const text = data.content?.find(b => b.type === "text")?.text || "";
-      const p = JSON.parse(text.replace(/```json|```/g, "").trim());
-      setScores({
-        presence: p.presence, clarity: p.clarity, predictability: p.predictability,
-        driveValue: p.driveValue, strategicGuidance: p.strategicGuidance, championing: p.championing,
-      });
-      if (p.scope) setScope(p.scope);
-      if (p.time) setTime(p.time);
-      if (p.duration) setDuration(p.duration);
-      if (p.numBuilders) setNumBuilders(p.numBuilders);
-      if (p.exBuilderHrs) setExBuilderHrs(p.exBuilderHrs);
-      if (p.exConnectorHrs) setExConnectorHrs(p.exConnectorHrs);
-      if (p.exAmplifierHrs && p.exAmplifierHrs > 0) { setExAmplifierHrs(p.exAmplifierHrs); setShowAmplifier(true); }
-      if (p.riskBuffer) setRiskBuffer(p.riskBuffer);
-      if (p.summary) setAiSummary(p.summary);
-      // Reset manual overrides so pillar-driven hours take effect
-      setManBuilderHrs(null); setManConnectorHrs(null); setManAmplifierHrs(null);
-    } catch(e) {
-      setAiSummary("Could not analyze — " + (e.message || "try again or complete fields manually."));
+  const fileInputRef = useRef(null);
+
+  const handleFileUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      alert("File too large. Max 10MB.");
+      return;
     }
-    setAnalyzing(false);
+    const allowed = ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/msword", "image/png", "image/jpeg"];
+    if (!allowed.includes(file.type)) {
+      alert("Unsupported file type. Please upload a PDF, Word doc, or image.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = reader.result.split(",")[1];
+      setUploadedFile({ data: base64, type: file.type, name: file.name });
+      setUploadedFileName(file.name);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeFile = () => {
+    setUploadedFile(null);
+    setUploadedFileName("");
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const reset = () => {
     setScores({}); setScope(null); setTime(null); setDuration(4); setNumBuilders(1);
-    setAccountText(""); setAiSummary(""); setExBuilderHrs(80); setExConnectorHrs(20);
+    setAccountText(""); setUploadedFile(null); setUploadedFileName("");
+    setExBuilderHrs(80); setExConnectorHrs(20);
     setExAmplifierHrs(0); setShowAmplifier(false); setRiskBuffer("Medium");
     setCommitTerm("none"); setNewClient(false); setNewClientPct(5);
     setFreeMonths(0); setManualDiscount(0); setShowDiscounts(false);
     setManBuilderHrs(null); setManConnectorHrs(null); setManAmplifierHrs(null);
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   const selBtn = (active, color) => ({
     border: `1px solid ${active?color:B.border}`, background: active?color+"18":B.surface,
     color: active?color:B.textMuted, transition: "all 0.15s",
   });
+
+  // Matrix display data
+  const matrixData = [
+    [null, "Defined", "Flexible", "Unknown"],
+    ["Timebound",
+      { label: "Execution", color: "#2A9D6A", desc: "Deliver X by Y date", s: "defined", t: "timebound" },
+      { label: "Operational", color: B.gold, desc: "Hands-on day-to-day relief", s: "flexible", t: "timebound" },
+      { label: "Ideation", color: "#7C5CBF", desc: "Clarity before commitment", s: "unknown", t: "timebound" },
+    ],
+    ["Ongoing",
+      { label: "Strategic", color: B.teal, desc: "Build toward roadmap", s: "defined", t: "ongoing" },
+      { label: "Strategic", color: B.teal, desc: "Build toward roadmap", s: "flexible", t: "ongoing" },
+      { label: "Ideation", color: "#7C5CBF", desc: "Clarity before commitment", s: "unknown", t: "ongoing" },
+    ],
+    ["Unknown",
+      { label: "Ideation", color: "#7C5CBF", desc: "Clarity before commitment", s: "defined", t: "unknown" },
+      { label: "Ideation", color: "#7C5CBF", desc: "Clarity before commitment", s: "flexible", t: "unknown" },
+      { label: "Ideation", color: "#7C5CBF", desc: "Clarity before commitment", s: "unknown", t: "unknown" },
+    ],
+  ];
+
+  const hasEngagement = scope && time;
 
   return (
     <div className="min-h-screen font-sans" style={{ background: B.bg, color: B.text }}>
@@ -393,76 +399,133 @@ export default function App() {
           <Card>
             <div className="flex items-center gap-2 mb-3">
               <StepBadge n="1" />
-              <h2 className="font-semibold text-white">Paste Account Strategy</h2>
+              <h2 className="font-semibold text-white">Account Strategy</h2>
               <span className="text-xs" style={{ color: B.textDim }}>(optional)</span>
             </div>
             <textarea className="w-full rounded-lg p-3 text-sm resize-none focus:outline-none"
               style={{ background: B.surface2, border: `1px solid ${B.border2}`, color: "#CCC", caretColor: B.gold }}
-              rows={4} placeholder="Paste account strategy or pre-sales notes. AI will auto-score all pillars and complete the engagement diagnostic..."
+              rows={3} placeholder="Paste account strategy or pre-sales notes..."
               value={accountText} onChange={e => setAccountText(e.target.value)} />
-            <button onClick={analyzeWithAI} disabled={!accountText.trim() || analyzing}
+
+            {/* File upload */}
+            <div className="mt-2">
+              <input ref={fileInputRef} type="file" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
+                onChange={handleFileUpload} className="hidden" id="file-upload" />
+              {!uploadedFile ? (
+                <button onClick={() => fileInputRef.current?.click()}
+                  className="w-full py-3 rounded-lg text-xs transition-all flex items-center justify-center gap-2"
+                  style={{ border: `1px dashed ${B.border2}`, background: B.surface2, color: B.textMuted }}>
+                  <span style={{ fontSize: "16px" }}>📎</span>
+                  Upload PDF, Word doc, or image
+                </button>
+              ) : (
+                <div className="flex items-center justify-between rounded-lg px-3 py-2"
+                  style={{ background: B.teal+"15", border: `1px solid ${B.teal}44` }}>
+                  <div className="flex items-center gap-2">
+                    <span style={{ fontSize: "14px" }}>📄</span>
+                    <span className="text-xs font-medium" style={{ color: B.lightBlue }}>{uploadedFileName}</span>
+                  </div>
+                  <button onClick={removeFile} className="text-xs px-2 py-1 rounded"
+                    style={{ color: B.textMuted, background: B.surface2 }}>✕ Remove</button>
+                </div>
+              )}
+            </div>
+
+            <button disabled={(!accountText.trim() && !uploadedFile)}
               className="mt-2 w-full py-2 rounded-lg font-semibold text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed"
               style={{
-                background: accountText.trim() && !analyzing ? `linear-gradient(135deg, ${B.gold}, ${B.orange})` : B.surface2,
-                color: accountText.trim() && !analyzing ? "#000" : B.textDim,
+                background: (accountText.trim() || uploadedFile) ? `linear-gradient(135deg, ${B.gold}, ${B.orange})` : B.surface2,
+                color: (accountText.trim() || uploadedFile) ? "#000" : B.textDim,
                 border: `1px solid ${B.border2}`
               }}>
-              {analyzing ? "Analyzing..." : "⚡ Auto-Score with AI"}
+              ⚡ Auto-Score with AI {uploadedFile ? "(with document)" : ""}
             </button>
-            {aiSummary && (
-              <div className="mt-3 p-3 rounded-lg text-xs"
-                style={{ background: B.teal+"18", border: `1px solid ${B.teal}44`, color: B.lightBlue }}>
-                <span className="font-semibold" style={{ color: "#7DD3FC" }}>AI Analysis: </span>{aiSummary}
-              </div>
-            )}
           </Card>
 
-          {/* STEP 2 */}
+          {/* STEP 2: Scope + Time + Matrix */}
           <Card>
             <div className="flex items-center gap-2 mb-1">
               <StepBadge n="2" />
               <h2 className="font-semibold text-white">What Does Devon Value?</h2>
             </div>
-            <p className="text-xs mb-4 ml-8" style={{ color: B.textDim }}>Two questions place Devon in the right engagement.</p>
+            <p className="text-xs mb-4 ml-8" style={{ color: B.textDim }}>Select scope and engagement horizon. Choose "Unknown" if not yet determined — this defaults to Ideation.</p>
+
             <div className="mb-3">
               <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: B.textMuted }}>Scope of work</div>
-              <div className="grid grid-cols-2 gap-2">
-                {[["defined","Defined","Clear requirements, known deliverables"],["flexible","Flexible","Still evolving, open questions remain"]].map(([v,l,s]) => (
-                  <button key={v} onClick={() => setScope(v)} className="rounded-lg p-3 text-left transition-all" style={selBtn(scope===v, B.gold)}>
-                    <div className="font-semibold text-sm">{l}</div><div className="text-xs mt-0.5" style={{ color: B.textDim }}>{s}</div>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  ["defined","Defined","Clear requirements, known deliverables"],
+                  ["flexible","Flexible","Still evolving, open questions remain"],
+                  ["unknown","Unknown","Not yet determined"],
+                ].map(([v,l,s]) => (
+                  <button key={v} onClick={() => { setScope(v); setManBuilderHrs(null); setManConnectorHrs(null); setManAmplifierHrs(null); }}
+                    className="rounded-lg p-3 text-left transition-all"
+                    style={selBtn(scope===v, v==="unknown"?"#7C5CBF":B.gold)}>
+                    <div className="font-semibold text-sm">{l}</div>
+                    <div className="text-xs mt-0.5" style={{ color: B.textDim }}>{s}</div>
                   </button>
                 ))}
               </div>
             </div>
+
             <div className="mb-4">
               <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: B.textMuted }}>Engagement horizon</div>
-              <div className="grid grid-cols-2 gap-2">
-                {[["ongoing","Ongoing","Continuous, no fixed end date"],["timebound","Time-Bound","Project with a defined end or deadline"]].map(([v,l,s]) => (
-                  <button key={v} onClick={() => setTime(v)} className="rounded-lg p-3 text-left transition-all" style={selBtn(time===v, B.gold)}>
-                    <div className="font-semibold text-sm">{l}</div><div className="text-xs mt-0.5" style={{ color: B.textDim }}>{s}</div>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  ["timebound","Time-Bound","Project with a defined end"],
+                  ["ongoing","Ongoing","Continuous, no fixed end date"],
+                  ["unknown","Unknown","Not yet determined"],
+                ].map(([v,l,s]) => (
+                  <button key={v} onClick={() => { setTime(v); setManBuilderHrs(null); setManConnectorHrs(null); setManAmplifierHrs(null); }}
+                    className="rounded-lg p-3 text-left transition-all"
+                    style={selBtn(time===v, v==="unknown"?"#7C5CBF":B.gold)}>
+                    <div className="font-semibold text-sm">{l}</div>
+                    <div className="text-xs mt-0.5" style={{ color: B.textDim }}>{s}</div>
                   </button>
                 ))}
               </div>
             </div>
+
+            {/* Engagement matrix visualization */}
             <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${B.border2}` }}>
-              <div className="grid grid-cols-3 text-xs">
+              <div className="grid grid-cols-4 text-xs">
+                {/* Header row */}
                 <div style={{ background: B.surface2 }} className="p-2"></div>
-                <div style={{ background: B.surface2, borderLeft: `1px solid ${B.border2}`, color: B.textMuted }} className="p-2 text-center font-semibold">Defined Scope</div>
-                <div style={{ background: B.surface2, borderLeft: `1px solid ${B.border2}`, color: B.textMuted }} className="p-2 text-center font-semibold">Flexible Scope</div>
-                {[["timebound","Time-Bound"],["ongoing","Ongoing"]].map(([t, tLabel]) => [
-                  <div key={t+"label"} style={{ background: B.surface2, borderTop: `1px solid ${B.border2}`, color: B.textMuted, writingMode:"vertical-rl", transform:"rotate(180deg)", minHeight:80 }} className="p-2 font-semibold flex items-center justify-center">{tLabel}</div>,
-                  ...["defined","flexible"].map(s => {
-                    const cell=MATRIX.find(m=>m.scope===s&&m.time===t), active=scope===s&&time===t;
-                    return <button key={t+s} onClick={()=>{setScope(s);setTime(t);}} className="p-3 text-left transition-all"
-                      style={{ background:active?cell.color+"22":"#0D0D0D", borderTop:`1px solid ${B.border2}`, borderLeft:`1px solid ${B.border2}` }}>
-                      <div className="font-bold text-sm mb-1" style={{ color:active?cell.color:B.textMuted }}>{cell.label}</div>
-                      <div className="text-xs" style={{ color:B.textDim }}>{cell.desc}</div>
-                      {active && <div className="text-xs mt-1 font-medium" style={{ color:cell.color }}>↳ {cell.value}</div>}
-                    </button>;
+                {["Defined", "Flexible", "Unknown"].map(h => (
+                  <div key={h} style={{ background: B.surface2, borderLeft: `1px solid ${B.border2}`, color: B.textMuted }} className="p-2 text-center font-semibold">{h}</div>
+                ))}
+                {/* Data rows */}
+                {matrixData.slice(1).map((row, ri) => (
+                  row.map((cell, ci) => {
+                    if (ci === 0) {
+                      return <div key={`r${ri}`} style={{ background: B.surface2, borderTop: `1px solid ${B.border2}`, color: B.textMuted }} className="p-2 font-semibold flex items-center justify-center text-center">{cell}</div>;
+                    }
+                    const active = scope === cell.s && time === cell.t;
+                    return (
+                      <button key={`r${ri}c${ci}`}
+                        onClick={() => { setScope(cell.s); setTime(cell.t); setManBuilderHrs(null); setManConnectorHrs(null); setManAmplifierHrs(null); }}
+                        className="p-2.5 text-left transition-all"
+                        style={{ background: active ? cell.color+"22" : "#0D0D0D", borderTop: `1px solid ${B.border2}`, borderLeft: `1px solid ${B.border2}` }}>
+                        <div className="font-bold text-xs mb-0.5" style={{ color: active ? cell.color : B.textMuted }}>{cell.label}</div>
+                        <div className="text-xs" style={{ color: B.textDim }}>{cell.desc}</div>
+                      </button>
+                    );
                   })
-                ])}
+                )).flat()}
               </div>
             </div>
+
+            {/* Engagement result badge */}
+            {hasEngagement && engCell && (
+              <div className="mt-3 p-3 rounded-lg flex items-center gap-3" style={{ background: engCell.color+"15", border: `1px solid ${engCell.color}44` }}>
+                <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: engCell.color }}></div>
+                <div>
+                  <div className="text-sm font-bold" style={{ color: engCell.color }}>{engCell.label}</div>
+                  <div className="text-xs" style={{ color: B.textMuted }}>{engCell.desc} — {engCell.value}</div>
+                </div>
+              </div>
+            )}
+
             {isIdeation && (
               <div className="mt-4 pt-4" style={{ borderTop: `1px solid ${B.border2}` }}>
                 <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: B.textMuted }}>Duration (sprint-aligned)</div>
@@ -484,7 +547,7 @@ export default function App() {
           </Card>
 
           {/* STEP 4: Hours (non-execution) */}
-          {!isExecution && allScored && scope && time && (
+          {!isExecution && allScored && hasEngagement && (
             <Card>
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
@@ -506,14 +569,11 @@ export default function App() {
                 ))}</div>
               </div>
               <HrsTypeInput label="Builder" value={builderHrs} recommended={recBuilderHrs}
-                onChange={v => setManBuilderHrs(v)} rate={builderRate} color={ROLE_COLORS.Builder}
-                breakdownLabel={builderBreakdown} />
+                onChange={v => setManBuilderHrs(v)} rate={builderRate} color={ROLE_COLORS.Builder} breakdownLabel={builderBreakdown} />
               <HrsTypeInput label="Connector" value={connectorHrs} recommended={recConnectorHrs}
-                onChange={v => setManConnectorHrs(v)} rate={RATES.connector} color={ROLE_COLORS.Connector}
-                breakdownLabel={connBreakdown} />
+                onChange={v => setManConnectorHrs(v)} rate={RATES.connector} color={ROLE_COLORS.Connector} breakdownLabel={connBreakdown} />
               <HrsTypeInput label="Amplifier" value={amplifierHrs} recommended={recAmplifierHrs}
-                onChange={v => setManAmplifierHrs(v)} rate={RATES.amplifier} color={ROLE_COLORS.Amplifier}
-                breakdownLabel={ampBreakdown} />
+                onChange={v => setManAmplifierHrs(v)} rate={RATES.amplifier} color={ROLE_COLORS.Amplifier} breakdownLabel={ampBreakdown} />
               <div className="mt-3 flex items-center justify-between rounded-lg px-3 py-2" style={{ background: B.border2 }}>
                 <div className="text-xs font-semibold text-white">Total Hours</div>
                 <div className="text-xs font-black text-white">{totalHrs} hrs/{isIdeation?"sprint":"mo"}</div>
@@ -522,7 +582,7 @@ export default function App() {
           )}
 
           {/* STEP 4: Hours (execution) */}
-          {isExecution && allScored && scope && time && (
+          {isExecution && allScored && hasEngagement && (
             <Card>
               <div className="flex items-center gap-2 mb-4">
                 <StepBadge n="4" />
@@ -547,7 +607,7 @@ export default function App() {
             </Card>
           )}
 
-          {/* STEP 5 */}
+          {/* STEP 5: Discounts */}
           <div className="rounded-xl p-5" style={{ background: B.surface, border: `1px solid ${B.border2}` }}>
             <button onClick={() => setShowDiscounts(!showDiscounts)} className="w-full flex items-center justify-between">
               <div className="flex items-center gap-2 flex-wrap">
@@ -637,9 +697,7 @@ export default function App() {
                 {needsApproval && (
                   <div className="p-3 rounded-lg" style={{ background:B.orange+"18", border:`1px solid ${B.orange}55` }}>
                     <div className="text-xs font-bold mb-1" style={{ color:B.orange }}>⚠ Manager Approval Required</div>
-                    <div className="text-xs" style={{ color:"#FCA98A" }}>
-                      Effective discount of {(discountEquivPct*100).toFixed(1)}% exceeds 10% threshold.
-                    </div>
+                    <div className="text-xs" style={{ color:"#FCA98A" }}>Effective discount of {(discountEquivPct*100).toFixed(1)}% exceeds 10% threshold.</div>
                   </div>
                 )}
               </div>
@@ -653,12 +711,12 @@ export default function App() {
             <h2 className="font-semibold text-white mb-4 flex items-center gap-2">
               <span style={{ color: B.gold }}>◆</span> Internal Pricing Output
             </h2>
-            {(!allScored||!scope||!time) ? (
+            {(!allScored||!hasEngagement) ? (
               <div className="text-center py-10">
                 <div className="text-4xl mb-3">📋</div>
                 <div className="text-sm mb-4" style={{ color: B.textMuted }}>Complete the diagnostic to generate your recommendation</div>
                 <div className="space-y-2">
-                  {[[scope&&time,"Devon Values Diagnostic"],[allScored,`All 6 Pillars Scored (${Object.keys(scores).length}/6)`]].map(([done,label],i) => (
+                  {[[hasEngagement,"Engagement Type Selected"],[allScored,`All 6 Pillars Scored (${Object.keys(scores).length}/6)`]].map(([done,label],i) => (
                     <div key={i} className="flex items-center gap-2 text-xs px-3 py-2 rounded-lg"
                       style={{ background:done?"#14532D44":B.surface2, border:`1px solid ${done?"#166534":B.border}`, color:done?"#4ADE80":B.textDim }}>
                       {done?"✓":"○"} {label}
@@ -668,16 +726,20 @@ export default function App() {
               </div>
             ) : (
               <div>
-                {matrixCell && (
-                  <div className="rounded-xl p-4 mb-4" style={{ background:matrixCell.color+"11", border:`1px solid ${matrixCell.color}44` }}>
+                {engCell && (
+                  <div className="rounded-xl p-4 mb-4" style={{ background:engCell.color+"11", border:`1px solid ${engCell.color}44` }}>
                     <div className="text-xs uppercase tracking-widest mb-1" style={{ color:B.textMuted }}>Devon Values</div>
-                    <div className="font-bold text-white">{matrixCell.value}</div>
-                    <div className="text-xs mt-1" style={{ color:B.textMuted }}>{matrixCell.label} · {scope==="defined"?"Defined":"Flexible"} · {time==="ongoing"?"Ongoing":"Time-bound"}</div>
+                    <div className="font-bold text-white">{engCell.value}</div>
+                    <div className="text-xs mt-1" style={{ color:B.textMuted }}>
+                      {engCell.label} · {scope==="unknown"?"Unknown":scope==="defined"?"Defined":"Flexible"} scope · {time==="unknown"?"Unknown":time==="ongoing"?"Ongoing":"Time-bound"}
+                    </div>
                   </div>
                 )}
                 {clientTierLabel && (
                   <div className="rounded-xl p-5 mb-4" style={{ background:clientTierColor+"11", border:`1px solid ${clientTierColor}44` }}>
-                    <div className="text-xs uppercase tracking-widest mb-1" style={{ color:B.textMuted }}>{isOp?"Operational Package":isSt?"Strategic Package":isIdeation?"Ideation · Fixed Duration":"Execution · Fixed Bid"}</div>
+                    <div className="text-xs uppercase tracking-widest mb-1" style={{ color:B.textMuted }}>
+                      {isOp?"Operational Package":isSt?"Strategic Package":isIdeation?"Ideation · Discovery":isExecution?"Execution · Fixed Bid":""}
+                    </div>
                     <div className="text-3xl font-black mb-1" style={{ color:clientTierColor }}>{clientTierLabel}</div>
                     <div className="text-sm" style={{ color:"#CCC" }}>{recTier?.desc||""}</div>
                   </div>
@@ -762,8 +824,8 @@ export default function App() {
                   <div className="space-y-2">
                     {[
                       { role:"Builder", color:ROLE_COLORS.Builder, sub:`${numBuilders} builder${numBuilders>1?"s":""} · Pred(${predScore||"–"}) + DV(${dvScore||"–"})`, hrs:builderHrs, rate:builderRate, show:true },
-                      { role:"Connector", color:ROLE_COLORS.Connector, sub:`Higher of Pres(${scores.presence||"–"})/Clar(${scores.clarity||"–"}) → ${connScore||"–"}`, hrs:connectorHrs, rate:RATES.connector, show:connectorHrs>0 },
-                      { role:"Amplifier", color:ROLE_COLORS.Amplifier, sub:`Higher of Strat(${scores.strategicGuidance||"–"})/Champ(${scores.championing||"–"}) → ${ampScore||"–"}`, hrs:amplifierHrs, rate:RATES.amplifier, show:amplifierHrs>0 },
+                      { role:"Connector", color:ROLE_COLORS.Connector, sub:`Pres(${scores.presence||"–"})/Clar(${scores.clarity||"–"}) → ${connScore||"–"}`, hrs:connectorHrs, rate:RATES.connector, show:connectorHrs>0 },
+                      { role:"Amplifier", color:ROLE_COLORS.Amplifier, sub:`Strat(${scores.strategicGuidance||"–"})/Champ(${scores.championing||"–"}) → ${ampScore||"–"}`, hrs:amplifierHrs, rate:RATES.amplifier, show:amplifierHrs>0 },
                     ].filter(r=>r.show).map(r => (
                       <div key={r.role} className="flex items-center justify-between rounded-lg px-3 py-2" style={{ background:B.surface2 }}>
                         <div className="flex items-center gap-2">
