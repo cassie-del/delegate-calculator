@@ -1,5 +1,8 @@
 // File: api/analyze.js
 // Place this at the ROOT of your repo (not inside src/)
+// Run: npm install mammoth (for Word doc support)
+
+import mammoth from "mammoth";
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
@@ -41,8 +44,9 @@ Respond ONLY with valid JSON, no markdown, no explanation:
 
     // Build the user message content blocks
     const contentBlocks = [];
+    let extractedDocText = "";
 
-    // Add file if provided (PDF or image)
+    // Handle file based on type
     if (fileData) {
       if (fileType === "application/pdf") {
         contentBlocks.push({
@@ -54,6 +58,18 @@ Respond ONLY with valid JSON, no markdown, no explanation:
           type: "image",
           source: { type: "base64", media_type: fileType, data: fileData },
         });
+      } else if (
+        fileType === "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ||
+        fileType === "application/msword"
+      ) {
+        // Extract text from Word docs using mammoth
+        try {
+          const buffer = Buffer.from(fileData, "base64");
+          const result = await mammoth.extractRawText({ buffer });
+          extractedDocText = result.value || "";
+        } catch (e) {
+          return res.status(400).json({ error: "Could not read Word document: " + e.message });
+        }
       }
     }
 
@@ -62,7 +78,10 @@ Respond ONLY with valid JSON, no markdown, no explanation:
     if (accountText && accountText.trim()) {
       textParts.push("Account Strategy:\n" + accountText.trim());
     }
-    if (fileData) {
+    if (extractedDocText) {
+      textParts.push("Extracted document content:\n" + extractedDocText);
+    }
+    if (fileData && !extractedDocText) {
       textParts.push("I've also attached a document with account/strategy information. Please analyze all provided content together.");
     }
     if (textParts.length === 0) {
