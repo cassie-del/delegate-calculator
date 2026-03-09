@@ -30,18 +30,13 @@ const VOLUME_DISCOUNTS = [
 ];
 const MAX_AUTO_DISCOUNT = 0.10;
 
-// Updated engagement matrix
 const getEngagement = (scope, time) => {
-  if (!scope || !time || scope === "unknown" || time === "unknown") {
+  if (!scope || !time || scope === "unknown" || time === "unknown")
     return { eng: "ideation", label: "Ideation", color: "#7C5CBF", desc: "Clarity before commitment", value: "Clarity & Confidence" };
-  }
-  if (scope === "defined" && time === "timebound") {
+  if (scope === "defined" && time === "timebound")
     return { eng: "execution", label: "Execution", color: "#2A9D6A", desc: "Deliver X by Y date", value: "Predictability & Accountability" };
-  }
-  if (scope === "flexible" && time === "timebound") {
+  if (scope === "flexible" && time === "timebound")
     return { eng: "operational", label: "Operational", color: B.gold, desc: "Hands-on day-to-day relief", value: "Capacity & Reliability" };
-  }
-  // defined+ongoing, flexible+ongoing
   return { eng: "strategic", label: "Strategic", color: B.teal, desc: "Build toward roadmap as priorities evolve", value: "Flexibility & Momentum" };
 };
 
@@ -50,7 +45,6 @@ const OP_TIERS = [
   { id: "elevate", label: "Elevate", desc: "Execution + proactive delivery presence", color: B.lightBlue },
   { id: "excel", label: "Excel", desc: "Max capacity + full delivery leadership", color: "#A855F7" },
 ];
-
 const ST_TIERS = [
   { id: "drive", label: "Drive", desc: "Dedicated team with strategic oversight", color: B.gold },
   { id: "amplify", label: "Amplify", desc: "Deeper presence + increased strategic guidance", color: B.lightBlue },
@@ -80,7 +74,7 @@ const higherScore = (a, b) => {
 };
 
 const DelegateLogo = () => (
-  <svg width="32" height="32" viewBox="0 0 100 100" fill="none">
+  <svg width="32" height="32" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
     <polygon points="50,5 95,27.5 95,72.5 50,95 5,72.5 5,27.5" fill="none" stroke="#2A2A2A" strokeWidth="2"/>
     <polygon points="50,15 85,32.5 85,67.5 50,85 15,67.5 15,32.5" fill="none" stroke="#333" strokeWidth="1"/>
     <line x1="50" y1="5" x2="50" y2="95" stroke={B.teal} strokeWidth="3" opacity="0.6"/>
@@ -93,10 +87,7 @@ const DelegateLogo = () => (
   </svg>
 );
 
-function Chip({ v }) {
-  if (!v) return null;
-  return <span className={ssClass(v)} style={ssStyle(v)}>{SL[v]}</span>;
-}
+function Chip({ v }) { if (!v) return null; return <span className={ssClass(v)} style={ssStyle(v)}>{SL[v]}</span>; }
 
 function PillarCard({ pillar, value, onChange }) {
   return (
@@ -105,8 +96,7 @@ function PillarCard({ pillar, value, onChange }) {
         <div>
           <div className="flex items-center gap-2 mb-1">
             <span className="font-bold text-white text-sm">{pillar.label}</span>
-            <span className="text-xs px-2 py-0.5 rounded-full font-medium"
-              style={{ backgroundColor: ROLE_COLORS[pillar.role]+"22", color: ROLE_COLORS[pillar.role], border: `1px solid ${ROLE_COLORS[pillar.role]}44` }}>{pillar.role}</span>
+            <span className="text-xs px-2 py-0.5 rounded-full font-medium" style={{ backgroundColor: ROLE_COLORS[pillar.role]+"22", color: ROLE_COLORS[pillar.role], border: `1px solid ${ROLE_COLORS[pillar.role]}44` }}>{pillar.role}</span>
           </div>
           <p className="text-xs italic" style={{ color: B.textMuted }}>"{pillar.question}"</p>
         </div>
@@ -129,37 +119,20 @@ function HrsTypeInput({ label, value, onChange, rate, color, recommended, breakd
   const [localVal, setLocalVal] = useState(String(value));
   const diff = recommended !== undefined ? value - recommended : 0;
   const hasDiff = recommended !== undefined && diff !== 0;
-
-  // Sync local display when value changes externally (e.g. reset, pillar change)
   const prevVal = React.useRef(value);
-  if (prevVal.current !== value && String(value) !== localVal) {
-    setLocalVal(String(value));
-  }
+  if (prevVal.current !== value && String(value) !== localVal) { setLocalVal(String(value)); }
   prevVal.current = value;
-
   return (
     <div className="rounded-lg px-3 py-2 mb-2" style={{ background: B.surface2 }}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="w-2 h-2 rounded-full" style={{ backgroundColor: color }}></div>
-          <div>
-            <div className="text-xs font-medium text-white">{label}</div>
-            <div className="text-xs" style={{ color: B.textDim }}>${rate}/hr</div>
-          </div>
+          <div><div className="text-xs font-medium text-white">{label}</div><div className="text-xs" style={{ color: B.textDim }}>${rate}/hr</div></div>
         </div>
         <div className="flex items-center gap-2">
           <input type="number" min={0} max={999} value={localVal}
-            onChange={e => {
-              setLocalVal(e.target.value);
-              const parsed = parseInt(e.target.value);
-              if (!isNaN(parsed)) onChange(Math.max(0, parsed));
-            }}
-            onBlur={() => {
-              const parsed = parseInt(localVal);
-              if (isNaN(parsed) || localVal === "") {
-                setLocalVal(String(value));
-              }
-            }}
+            onChange={e => { setLocalVal(e.target.value); const p = parseInt(e.target.value); if (!isNaN(p)) onChange(Math.max(0, p)); }}
+            onBlur={() => { if (isNaN(parseInt(localVal)) || localVal === "") setLocalVal(String(value)); }}
             className="w-16 rounded-md px-2 py-1 text-sm text-white text-center font-bold focus:outline-none"
             style={{ background: B.surface, border: `1px solid ${hasDiff ? B.gold+"88" : B.border2}` }} />
           <span className="text-xs" style={{ color: B.textDim }}>hrs</span>
@@ -168,11 +141,7 @@ function HrsTypeInput({ label, value, onChange, rate, color, recommended, breakd
       {breakdownLabel && (
         <div className="mt-1.5 pt-1.5 flex items-center justify-between" style={{ borderTop: `1px solid ${B.border}` }}>
           <span className="text-xs" style={{ color: B.textDim }}>{breakdownLabel}</span>
-          {hasDiff && (
-            <span className="text-xs font-semibold" style={{ color: diff > 0 ? B.orange : "#4ADE80" }}>
-              {diff > 0 ? `+${diff}` : diff}h vs recommended
-            </span>
-          )}
+          {hasDiff && <span className="text-xs font-semibold" style={{ color: diff > 0 ? B.orange : "#4ADE80" }}>{diff > 0 ? `+${diff}` : diff}h vs recommended</span>}
         </div>
       )}
     </div>
@@ -180,15 +149,16 @@ function HrsTypeInput({ label, value, onChange, rate, color, recommended, breakd
 }
 
 function StepBadge({ n }) {
-  return <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-black flex-shrink-0"
-    style={{ background: `linear-gradient(135deg, ${B.gold}, ${B.orange})` }}>{n}</div>;
+  return <div className="w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold text-black flex-shrink-0" style={{ background: `linear-gradient(135deg, ${B.gold}, ${B.orange})` }}>{n}</div>;
 }
-
 function Card({ children, className="" }) {
   return <div className={`rounded-xl p-5 mb-5 ${className}`} style={{ background: B.surface, border: `1px solid ${B.border2}` }}>{children}</div>;
 }
 
 export default function App() {
+  const [authed, setAuthed] = useState(false);
+  const [pw, setPw] = useState('');
+  const [pwErr, setPwErr] = useState(false);
   const [scores, setScores] = useState({});
   const [scope, setScope] = useState(null);
   const [time, setTime] = useState(null);
@@ -197,73 +167,74 @@ export default function App() {
   const [accountText, setAccountText] = useState("");
   const [uploadedFile, setUploadedFile] = useState(null);
   const [uploadedFileName, setUploadedFileName] = useState("");
-
+  const [analyzing, setAnalyzing] = useState(false);
+  const [aiSummary, setAiSummary] = useState("");
   const [manBuilderHrs, setManBuilderHrs] = useState(null);
   const [manConnectorHrs, setManConnectorHrs] = useState(null);
   const [manAmplifierHrs, setManAmplifierHrs] = useState(null);
-
   const [exBuilderHrs, setExBuilderHrs] = useState(80);
   const [exConnectorHrs, setExConnectorHrs] = useState(20);
   const [exAmplifierHrs, setExAmplifierHrs] = useState(0);
   const [showAmplifier, setShowAmplifier] = useState(false);
   const [riskBuffer, setRiskBuffer] = useState("Medium");
-
   const [commitTerm, setCommitTerm] = useState("none");
   const [newClient, setNewClient] = useState(false);
   const [newClientPct, setNewClientPct] = useState(5);
   const [freeMonths, setFreeMonths] = useState(0);
   const [manualDiscount, setManualDiscount] = useState(0);
   const [showDiscounts, setShowDiscounts] = useState(false);
+  const fileInputRef = useRef(null);
 
+  // Login
+  const handleLogin = () => {
+    if (pw === import.meta.env.VITE_APP_PASSWORD) { setAuthed(true); }
+    else { setPwErr(true); setTimeout(() => setPwErr(false), 2000); }
+  };
+
+  if (!authed) return (
+    <div className="min-h-screen bg-black flex items-center justify-center">
+      <div className="bg-gray-900 border border-gray-700 rounded-2xl p-10 w-full max-w-sm text-center">
+        <div className="flex items-center justify-center gap-2 mb-8"><DelegateLogo /><span className="text-lg font-black tracking-tight text-white">Delegate</span></div>
+        <h1 className="text-white font-bold text-lg mb-1">Pricing Calculator</h1>
+        <p className="text-gray-500 text-xs mb-6">Internal use only</p>
+        <input type="password" placeholder="Enter team password" value={pw} onChange={e => setPw(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleLogin()}
+          className={`w-full bg-gray-800 border rounded-lg px-4 py-3 text-white text-sm text-center focus:outline-none mb-3 ${pwErr ? 'border-red-500' : 'border-gray-600 focus:border-yellow-500'}`} />
+        {pwErr && <p className="text-red-400 text-xs mb-3">Incorrect password. Try again.</p>}
+        <button onClick={handleLogin} className="w-full py-3 rounded-lg font-semibold text-sm text-black transition-all" style={{ backgroundColor: '#F59E0B' }}>Enter</button>
+      </div>
+    </div>
+  );
+
+  // Calculator logic
   const setScore = (id, val) => setScores(s => ({ ...s, [id]: val }));
   const allScored = PILLARS.every(p => scores[p.id]);
-
-  // Engagement type from matrix
   const engCell = (scope && time) ? getEngagement(scope, time) : null;
   const engType = engCell?.eng;
-  const isOp = engType==="operational", isSt = engType==="strategic";
-  const isIdeation = engType==="ideation", isExecution = engType==="execution";
+  const isOp = engType==="operational", isSt = engType==="strategic", isIdeation = engType==="ideation", isExecution = engType==="execution";
   const isProject = isIdeation||isExecution, isRetainer = isOp||isSt;
-
   const avgMult = allScored ? PILLARS.reduce((s,p) => s+MULT[scores[p.id]],0)/PILLARS.length : null;
 
-  const predScore = scores.predictability;
-  const dvScore = scores.driveValue;
+  const predScore = scores.predictability, dvScore = scores.driveValue;
   const connScore = higherScore(scores.presence, scores.clarity);
   const ampScore = higherScore(scores.strategicGuidance, scores.championing);
-
-  const recBuilderBase = BUILDER_BASE * numBuilders;
   const recBuilderExtra = (predScore ? PILLAR_EXTRA[predScore] : 0) + (dvScore ? PILLAR_EXTRA[dvScore] : 0);
-  const recBuilderHrs = allScored ? recBuilderBase + (recBuilderExtra * numBuilders) : 0;
+  const recBuilderHrs = allScored ? (BUILDER_BASE * numBuilders) + (recBuilderExtra * numBuilders) : 0;
   const recConnectorHrs = connScore ? CONNECTOR_HRS[connScore] : 0;
   const recAmplifierHrs = ampScore ? AMPLIFIER_HRS[ampScore] : 0;
 
-  const builderBreakdown = allScored
-    ? `${numBuilders}×${BUILDER_BASE}h base + ${numBuilders}×${recBuilderExtra}h (Pred: ${predScore} +${PILLAR_EXTRA[predScore]}, DV: ${dvScore} +${PILLAR_EXTRA[dvScore]})`
-    : "Score pillars to calculate";
-  const connBreakdown = connScore
-    ? `Higher of Pres(${scores.presence})/Clar(${scores.clarity}) → ${connScore} = ${CONNECTOR_HRS[connScore]}h/mo`
-    : "Score pillars to calculate";
-  const ampBreakdown = ampScore
-    ? `Higher of Strat(${scores.strategicGuidance})/Champ(${scores.championing}) → ${ampScore} = ${AMPLIFIER_HRS[ampScore]}h/mo`
-    : "Score pillars to calculate";
+  const builderBreakdown = allScored ? `${numBuilders}×${BUILDER_BASE}h + ${numBuilders}×${recBuilderExtra}h (Pred:${predScore} +${PILLAR_EXTRA[predScore]}, DV:${dvScore} +${PILLAR_EXTRA[dvScore]})` : "Score pillars to calculate";
+  const connBreakdown = connScore ? `Higher of Pres(${scores.presence})/Clar(${scores.clarity}) → ${connScore} = ${CONNECTOR_HRS[connScore]}h/mo` : "Score pillars to calculate";
+  const ampBreakdown = ampScore ? `Higher of Strat(${scores.strategicGuidance})/Champ(${scores.championing}) → ${ampScore} = ${AMPLIFIER_HRS[ampScore]}h/mo` : "Score pillars to calculate";
 
   let builderRate = RATES.builderSt;
   if (isOp) builderRate = RATES.builderOp;
   else if (isExecution) builderRate = RATES.builderEx;
 
   let builderHrs, connectorHrs, amplifierHrs;
-  if (isExecution) {
-    builderHrs=exBuilderHrs; connectorHrs=exConnectorHrs; amplifierHrs=showAmplifier?exAmplifierHrs:0;
-  } else {
-    builderHrs = manBuilderHrs !== null ? manBuilderHrs : recBuilderHrs;
-    connectorHrs = manConnectorHrs !== null ? manConnectorHrs : recConnectorHrs;
-    amplifierHrs = manAmplifierHrs !== null ? manAmplifierHrs : recAmplifierHrs;
-  }
+  if (isExecution) { builderHrs=exBuilderHrs; connectorHrs=exConnectorHrs; amplifierHrs=showAmplifier?exAmplifierHrs:0; }
+  else { builderHrs=manBuilderHrs!==null?manBuilderHrs:recBuilderHrs; connectorHrs=manConnectorHrs!==null?manConnectorHrs:recConnectorHrs; amplifierHrs=manAmplifierHrs!==null?manAmplifierHrs:recAmplifierHrs; }
 
-  const anyDiff = !isExecution && (manBuilderHrs!==null||manConnectorHrs!==null||manAmplifierHrs!==null)
-    && (builderHrs!==recBuilderHrs||connectorHrs!==recConnectorHrs||amplifierHrs!==recAmplifierHrs);
-
+  const anyDiff = !isExecution && (manBuilderHrs!==null||manConnectorHrs!==null||manAmplifierHrs!==null) && (builderHrs!==recBuilderHrs||connectorHrs!==recConnectorHrs||amplifierHrs!==recAmplifierHrs);
   const totalHrs = builderHrs+connectorHrs+amplifierHrs;
   const recTotalHrs = recBuilderHrs+recConnectorHrs+recAmplifierHrs;
   const baseInv = (builderHrs*builderRate)+(connectorHrs*RATES.connector)+(amplifierHrs*RATES.amplifier);
@@ -273,276 +244,197 @@ export default function App() {
   const afterRisk = isExecution ? afterMult*(1+RISK_BUFFERS[riskBuffer]) : afterMult;
   const monthlyInv = afterRisk;
 
-  const commitDiscPct = commitTerm !== "none" ? COMMIT_DISCOUNTS[commitTerm] : 0;
+  const commitDiscPct = commitTerm!=="none" ? COMMIT_DISCOUNTS[commitTerm] : 0;
   const newClientDisc = newClient ? newClientPct/100 : 0;
   const volDisc = isRetainer ? (VOLUME_DISCOUNTS.find(v => totalHrs>=v.min && totalHrs<=v.max)?.pct||0) : 0;
   const manualDisc = manualDiscount/100;
-  const pctDiscTotal = commitDiscPct + newClientDisc + volDisc + manualDisc;
-  const monthlyAfterPctDisc = monthlyInv * (1-pctDiscTotal);
+  const pctDiscTotal = commitDiscPct+newClientDisc+volDisc+manualDisc;
+  const monthlyAfterPctDisc = monthlyInv*(1-pctDiscTotal);
   const termMonths = COMMIT_TERMS[commitTerm]||1;
-  const paidMonths = Math.max(1, termMonths - freeMonths);
-  const freeMonthValue = freeMonths > 0 ? monthlyAfterPctDisc * freeMonths : 0;
-  const termRevenue = isRetainer && commitTerm!=="none" ? monthlyAfterPctDisc*paidMonths : monthlyAfterPctDisc;
-  const termHrsDelivered = isRetainer && commitTerm!=="none" ? totalHrs*termMonths : totalHrs;
-  const effectiveBlendedRate = isRetainer && commitTerm!=="none" && termHrsDelivered>0
-    ? Math.round(termRevenue/termHrsDelivered) : Math.round(monthlyAfterPctDisc/(totalHrs||1));
+  const paidMonths = Math.max(1, termMonths-freeMonths);
+  const freeMonthValue = freeMonths>0 ? monthlyAfterPctDisc*freeMonths : 0;
+  const termRevenue = isRetainer&&commitTerm!=="none" ? monthlyAfterPctDisc*paidMonths : monthlyAfterPctDisc;
+  const termHrsDelivered = isRetainer&&commitTerm!=="none" ? totalHrs*termMonths : totalHrs;
+  const effectiveBlendedRate = isRetainer&&commitTerm!=="none"&&termHrsDelivered>0 ? Math.round(termRevenue/termHrsDelivered) : Math.round(monthlyAfterPctDisc/(totalHrs||1));
   const finalMonthly = Math.round(monthlyAfterPctDisc/100)*100;
-  const finalTermTotal = isRetainer && commitTerm!=="none" ? Math.round(termRevenue/100)*100 : null;
+  const finalTermTotal = isRetainer&&commitTerm!=="none" ? Math.round(termRevenue/100)*100 : null;
   const discountEquivPct = blendedRate>0 ? 1-(effectiveBlendedRate/blendedRate) : 0;
   const needsApproval = (pctDiscTotal>MAX_AUTO_DISCOUNT)||(freeMonths>0&&discountEquivPct>MAX_AUTO_DISCOUNT);
 
   const needsConnector = ["presence","clarity"].some(p => scores[p]==="M"||scores[p]==="H");
   const amplifierDepth = ["strategicGuidance","championing"].filter(p => scores[p]==="H").length;
-  const recTier = isOp ? (needsConnector?(numBuilders>1?OP_TIERS[2]:OP_TIERS[1]):OP_TIERS[0])
-    : isSt ? (amplifierDepth>=2?ST_TIERS[2]:amplifierDepth===1?ST_TIERS[1]:ST_TIERS[0]) : null;
+  const recTier = isOp?(needsConnector?(numBuilders>1?OP_TIERS[2]:OP_TIERS[1]):OP_TIERS[0]):isSt?(amplifierDepth>=2?ST_TIERS[2]:amplifierDepth===1?ST_TIERS[1]:ST_TIERS[0]):null;
   const clientTierLabel = recTier?.label||(isIdeation?"Ideation":isExecution?"Execution Project":null);
   const clientTierColor = recTier?.color||(isIdeation?"#7C5CBF":isExecution?"#2A9D6A":B.textDim);
 
   const discountParts = [];
-  if (freeMonths > 0) discountParts.push(`${freeMonths} free mo`);
-  if (pctDiscTotal > 0) discountParts.push(`−${(pctDiscTotal*100).toFixed(0)}%`);
+  if (freeMonths>0) discountParts.push(`${freeMonths} free mo`);
+  if (pctDiscTotal>0) discountParts.push(`−${(pctDiscTotal*100).toFixed(0)}%`);
   const discountBadgeText = discountParts.join(" + ");
+  const hasEngagement = scope && time;
 
-  const fileInputRef = useRef(null);
-
+  // File upload
   const handleFileUpload = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const maxSize = 10 * 1024 * 1024; // 10MB
-    if (file.size > maxSize) {
-      alert("File too large. Max 10MB.");
-      return;
-    }
-    const allowed = ["application/pdf", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "application/msword", "image/png", "image/jpeg"];
-    if (!allowed.includes(file.type)) {
-      alert("Unsupported file type. Please upload a PDF, Word doc, or image.");
-      return;
-    }
+    if (file.size > 10*1024*1024) { alert("File too large. Max 10MB."); return; }
+    const allowed = ["application/pdf","application/vnd.openxmlformats-officedocument.wordprocessingml.document","application/msword","image/png","image/jpeg"];
+    if (!allowed.includes(file.type)) { alert("Please upload a PDF, Word doc, or image."); return; }
     const reader = new FileReader();
-    reader.onload = () => {
-      const base64 = reader.result.split(",")[1];
-      setUploadedFile({ data: base64, type: file.type, name: file.name });
-      setUploadedFileName(file.name);
-    };
+    reader.onload = () => { setUploadedFile({ data: reader.result.split(",")[1], type: file.type, name: file.name }); setUploadedFileName(file.name); };
     reader.readAsDataURL(file);
   };
+  const removeFile = () => { setUploadedFile(null); setUploadedFileName(""); if (fileInputRef.current) fileInputRef.current.value=""; };
 
-  const removeFile = () => {
-    setUploadedFile(null);
-    setUploadedFileName("");
-    if (fileInputRef.current) fileInputRef.current.value = "";
+  // AI scoring
+  const analyzeWithAI = async () => {
+    if (!accountText.trim() && !uploadedFile) return;
+    setAnalyzing(true); setAiSummary("");
+    try {
+      const body = { accountText: accountText.trim() };
+      if (uploadedFile) { body.fileData = uploadedFile.data; body.fileType = uploadedFile.type; body.fileName = uploadedFile.name; }
+      const res = await fetch("/api/analyze", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "API request failed");
+      const text = data.content?.find(b => b.type==="text")?.text || "";
+      const p = JSON.parse(text.replace(/```json|```/g,"").trim());
+      setScores({ presence:p.presence, clarity:p.clarity, predictability:p.predictability, driveValue:p.driveValue, strategicGuidance:p.strategicGuidance, championing:p.championing });
+      if (p.scope) setScope(p.scope);
+      if (p.time) setTime(p.time);
+      if (p.duration) setDuration(p.duration);
+      if (p.numBuilders) setNumBuilders(p.numBuilders);
+      if (p.exBuilderHrs) setExBuilderHrs(p.exBuilderHrs);
+      if (p.exConnectorHrs) setExConnectorHrs(p.exConnectorHrs);
+      if (p.exAmplifierHrs && p.exAmplifierHrs>0) { setExAmplifierHrs(p.exAmplifierHrs); setShowAmplifier(true); }
+      if (p.riskBuffer) setRiskBuffer(p.riskBuffer);
+      if (p.summary) setAiSummary(p.summary);
+      setManBuilderHrs(null); setManConnectorHrs(null); setManAmplifierHrs(null);
+    } catch(e) { setAiSummary("Could not analyze — "+(e.message||"try again or complete fields manually.")); }
+    setAnalyzing(false);
   };
 
   const reset = () => {
     setScores({}); setScope(null); setTime(null); setDuration(4); setNumBuilders(1);
-    setAccountText(""); setUploadedFile(null); setUploadedFileName("");
-    setExBuilderHrs(80); setExConnectorHrs(20);
-    setExAmplifierHrs(0); setShowAmplifier(false); setRiskBuffer("Medium");
-    setCommitTerm("none"); setNewClient(false); setNewClientPct(5);
-    setFreeMonths(0); setManualDiscount(0); setShowDiscounts(false);
+    setAccountText(""); setUploadedFile(null); setUploadedFileName(""); setAiSummary(""); setAnalyzing(false);
+    setExBuilderHrs(80); setExConnectorHrs(20); setExAmplifierHrs(0); setShowAmplifier(false); setRiskBuffer("Medium");
+    setCommitTerm("none"); setNewClient(false); setNewClientPct(5); setFreeMonths(0); setManualDiscount(0); setShowDiscounts(false);
     setManBuilderHrs(null); setManConnectorHrs(null); setManAmplifierHrs(null);
-    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (fileInputRef.current) fileInputRef.current.value="";
   };
 
-  const selBtn = (active, color) => ({
-    border: `1px solid ${active?color:B.border}`, background: active?color+"18":B.surface,
-    color: active?color:B.textMuted, transition: "all 0.15s",
-  });
+  const selBtn = (active, color) => ({ border:`1px solid ${active?color:B.border}`, background:active?color+"18":B.surface, color:active?color:B.textMuted, transition:"all 0.15s" });
 
-  // Matrix display data
   const matrixData = [
-    [null, "Defined", "Flexible", "Unknown"],
+    [null,"Defined","Flexible","Unknown"],
     ["Timebound",
-      { label: "Execution", color: "#2A9D6A", desc: "Deliver X by Y date", s: "defined", t: "timebound" },
-      { label: "Operational", color: B.gold, desc: "Hands-on day-to-day relief", s: "flexible", t: "timebound" },
-      { label: "Ideation", color: "#7C5CBF", desc: "Clarity before commitment", s: "unknown", t: "timebound" },
-    ],
+      { label:"Execution", color:"#2A9D6A", desc:"Deliver X by Y date", s:"defined", t:"timebound" },
+      { label:"Operational", color:B.gold, desc:"Hands-on day-to-day relief", s:"flexible", t:"timebound" },
+      { label:"Ideation", color:"#7C5CBF", desc:"Clarity before commitment", s:"unknown", t:"timebound" }],
     ["Ongoing",
-      { label: "Strategic", color: B.teal, desc: "Build toward roadmap", s: "defined", t: "ongoing" },
-      { label: "Strategic", color: B.teal, desc: "Build toward roadmap", s: "flexible", t: "ongoing" },
-      { label: "Ideation", color: "#7C5CBF", desc: "Clarity before commitment", s: "unknown", t: "ongoing" },
-    ],
+      { label:"Strategic", color:B.teal, desc:"Build toward roadmap", s:"defined", t:"ongoing" },
+      { label:"Strategic", color:B.teal, desc:"Build toward roadmap", s:"flexible", t:"ongoing" },
+      { label:"Ideation", color:"#7C5CBF", desc:"Clarity before commitment", s:"unknown", t:"ongoing" }],
     ["Unknown",
-      { label: "Ideation", color: "#7C5CBF", desc: "Clarity before commitment", s: "defined", t: "unknown" },
-      { label: "Ideation", color: "#7C5CBF", desc: "Clarity before commitment", s: "flexible", t: "unknown" },
-      { label: "Ideation", color: "#7C5CBF", desc: "Clarity before commitment", s: "unknown", t: "unknown" },
-    ],
+      { label:"Ideation", color:"#7C5CBF", desc:"Clarity before commitment", s:"defined", t:"unknown" },
+      { label:"Ideation", color:"#7C5CBF", desc:"Clarity before commitment", s:"flexible", t:"unknown" },
+      { label:"Ideation", color:"#7C5CBF", desc:"Clarity before commitment", s:"unknown", t:"unknown" }],
   ];
 
-  const hasEngagement = scope && time;
-
   return (
-    <div className="min-h-screen font-sans" style={{ background: B.bg, color: B.text }}>
-      <div style={{ borderBottom: `1px solid ${B.border2}`, background: B.surface }} className="px-6 py-4">
+    <div className="min-h-screen font-sans" style={{ background:B.bg, color:B.text }}>
+      <div style={{ borderBottom:`1px solid ${B.border2}`, background:B.surface }} className="px-6 py-4">
         <div className="max-w-5xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <DelegateLogo />
-            <div>
-              <div className="text-lg font-black tracking-tight text-white">Delegate</div>
-              <div className="text-xs" style={{ color: B.textDim }}>Pricing & Resourcing Calculator</div>
-            </div>
-          </div>
-          <div className="text-right">
-            <div className="text-xs mb-1" style={{ color: B.textDim }}>Role Rates</div>
-            <div className="flex gap-3 text-xs">
-              <div><span className="font-bold" style={{ color: B.gold }}>Builder</span><span style={{ color: B.textMuted }}> $225–$240</span></div>
-              <div><span className="font-bold" style={{ color: B.lightBlue }}>Connector</span><span style={{ color: B.textMuted }}> $265</span></div>
-              <div><span className="font-bold" style={{ color: B.orange }}>Amplifier</span><span style={{ color: B.textMuted }}> $325</span></div>
-            </div>
+          <div className="flex items-center gap-3"><DelegateLogo /><div><div className="text-lg font-black tracking-tight text-white">Delegate</div><div className="text-xs" style={{ color:B.textDim }}>Pricing & Resourcing Calculator</div></div></div>
+          <div className="text-right"><div className="text-xs mb-1" style={{ color:B.textDim }}>Role Rates</div>
+            <div className="flex gap-3 text-xs"><div><span className="font-bold" style={{ color:B.gold }}>Builder</span><span style={{ color:B.textMuted }}> $225–$240</span></div><div><span className="font-bold" style={{ color:B.lightBlue }}>Connector</span><span style={{ color:B.textMuted }}> $265</span></div><div><span className="font-bold" style={{ color:B.orange }}>Amplifier</span><span style={{ color:B.textMuted }}> $325</span></div></div>
           </div>
         </div>
       </div>
 
       <div className="max-w-5xl mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div>
-          {/* STEP 1 */}
+          {/* STEP 1: Account Strategy + File Upload + AI */}
           <Card>
-            <div className="flex items-center gap-2 mb-3">
-              <StepBadge n="1" />
-              <h2 className="font-semibold text-white">Account Strategy</h2>
-              <span className="text-xs" style={{ color: B.textDim }}>(optional)</span>
-            </div>
-            <textarea className="w-full rounded-lg p-3 text-sm resize-none focus:outline-none"
-              style={{ background: B.surface2, border: `1px solid ${B.border2}`, color: "#CCC", caretColor: B.gold }}
-              rows={3} placeholder="Paste account strategy or pre-sales notes..."
-              value={accountText} onChange={e => setAccountText(e.target.value)} />
-
-            {/* File upload */}
+            <div className="flex items-center gap-2 mb-3"><StepBadge n="1" /><h2 className="font-semibold text-white">Account Strategy</h2><span className="text-xs" style={{ color:B.textDim }}>(optional)</span></div>
+            <textarea className="w-full rounded-lg p-3 text-sm resize-none focus:outline-none" style={{ background:B.surface2, border:`1px solid ${B.border2}`, color:"#CCC", caretColor:B.gold }} rows={3} placeholder="Paste account strategy or pre-sales notes..." value={accountText} onChange={e => setAccountText(e.target.value)} />
             <div className="mt-2">
-              <input ref={fileInputRef} type="file" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg"
-                onChange={handleFileUpload} className="hidden" id="file-upload" />
+              <input ref={fileInputRef} type="file" accept=".pdf,.doc,.docx,.png,.jpg,.jpeg" onChange={handleFileUpload} className="hidden" />
               {!uploadedFile ? (
-                <button onClick={() => fileInputRef.current?.click()}
-                  className="w-full py-3 rounded-lg text-xs transition-all flex items-center justify-center gap-2"
-                  style={{ border: `1px dashed ${B.border2}`, background: B.surface2, color: B.textMuted }}>
-                  <span style={{ fontSize: "16px" }}>📎</span>
-                  Upload PDF, Word doc, or image
+                <button onClick={() => fileInputRef.current?.click()} className="w-full py-3 rounded-lg text-xs transition-all flex items-center justify-center gap-2" style={{ border:`1px dashed ${B.border2}`, background:B.surface2, color:B.textMuted }}>
+                  <span style={{ fontSize:"16px" }}>📎</span> Upload PDF, Word doc, or image
                 </button>
               ) : (
-                <div className="flex items-center justify-between rounded-lg px-3 py-2"
-                  style={{ background: B.teal+"15", border: `1px solid ${B.teal}44` }}>
-                  <div className="flex items-center gap-2">
-                    <span style={{ fontSize: "14px" }}>📄</span>
-                    <span className="text-xs font-medium" style={{ color: B.lightBlue }}>{uploadedFileName}</span>
-                  </div>
-                  <button onClick={removeFile} className="text-xs px-2 py-1 rounded"
-                    style={{ color: B.textMuted, background: B.surface2 }}>✕ Remove</button>
+                <div className="flex items-center justify-between rounded-lg px-3 py-2" style={{ background:B.teal+"15", border:`1px solid ${B.teal}44` }}>
+                  <div className="flex items-center gap-2"><span style={{ fontSize:"14px" }}>📄</span><span className="text-xs font-medium" style={{ color:B.lightBlue }}>{uploadedFileName}</span></div>
+                  <button onClick={removeFile} className="text-xs px-2 py-1 rounded" style={{ color:B.textMuted, background:B.surface2 }}>✕ Remove</button>
                 </div>
               )}
             </div>
-
-            <button disabled={(!accountText.trim() && !uploadedFile)}
+            <button onClick={analyzeWithAI} disabled={(!accountText.trim()&&!uploadedFile)||analyzing}
               className="mt-2 w-full py-2 rounded-lg font-semibold text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-              style={{
-                background: (accountText.trim() || uploadedFile) ? `linear-gradient(135deg, ${B.gold}, ${B.orange})` : B.surface2,
-                color: (accountText.trim() || uploadedFile) ? "#000" : B.textDim,
-                border: `1px solid ${B.border2}`
-              }}>
-              ⚡ Auto-Score with AI {uploadedFile ? "(with document)" : ""}
+              style={{ background:(accountText.trim()||uploadedFile)&&!analyzing?`linear-gradient(135deg, ${B.gold}, ${B.orange})`:B.surface2, color:(accountText.trim()||uploadedFile)&&!analyzing?"#000":B.textDim, border:`1px solid ${B.border2}` }}>
+              {analyzing ? "Analyzing..." : `⚡ Auto-Score with AI${uploadedFile?" (with document)":""}`}
             </button>
+            {aiSummary && <div className="mt-3 p-3 rounded-lg text-xs" style={{ background:B.teal+"18", border:`1px solid ${B.teal}44`, color:B.lightBlue }}><span className="font-semibold" style={{ color:"#7DD3FC" }}>AI Analysis: </span>{aiSummary}</div>}
           </Card>
 
-          {/* STEP 2: Scope + Time + Matrix */}
+          {/* STEP 2: Scope + Time */}
           <Card>
-            <div className="flex items-center gap-2 mb-1">
-              <StepBadge n="2" />
-              <h2 className="font-semibold text-white">What Does Devon Value?</h2>
-            </div>
-            <p className="text-xs mb-4 ml-8" style={{ color: B.textDim }}>Select scope and engagement horizon. Choose "Unknown" if not yet determined — this defaults to Ideation.</p>
-
+            <div className="flex items-center gap-2 mb-1"><StepBadge n="2" /><h2 className="font-semibold text-white">What Does Devon Value?</h2></div>
+            <p className="text-xs mb-4 ml-8" style={{ color:B.textDim }}>Select scope and engagement horizon. Choose "Unknown" to default to Ideation.</p>
             <div className="mb-3">
-              <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: B.textMuted }}>Scope of work</div>
+              <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color:B.textMuted }}>Scope of work</div>
               <div className="grid grid-cols-3 gap-2">
-                {[
-                  ["defined","Defined","Clear requirements, known deliverables"],
-                  ["flexible","Flexible","Still evolving, open questions remain"],
-                  ["unknown","Unknown","Not yet determined"],
-                ].map(([v,l,s]) => (
-                  <button key={v} onClick={() => { setScope(v); setManBuilderHrs(null); setManConnectorHrs(null); setManAmplifierHrs(null); }}
-                    className="rounded-lg p-3 text-left transition-all"
-                    style={selBtn(scope===v, v==="unknown"?"#7C5CBF":B.gold)}>
-                    <div className="font-semibold text-sm">{l}</div>
-                    <div className="text-xs mt-0.5" style={{ color: B.textDim }}>{s}</div>
+                {[["defined","Defined","Clear requirements"],["flexible","Flexible","Still evolving"],["unknown","Unknown","Not yet determined"]].map(([v,l,s]) => (
+                  <button key={v} onClick={() => { setScope(v); setManBuilderHrs(null); setManConnectorHrs(null); setManAmplifierHrs(null); }} className="rounded-lg p-3 text-left transition-all" style={selBtn(scope===v, v==="unknown"?"#7C5CBF":B.gold)}>
+                    <div className="font-semibold text-sm">{l}</div><div className="text-xs mt-0.5" style={{ color:B.textDim }}>{s}</div>
                   </button>
                 ))}
               </div>
             </div>
-
             <div className="mb-4">
-              <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: B.textMuted }}>Engagement horizon</div>
+              <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color:B.textMuted }}>Engagement horizon</div>
               <div className="grid grid-cols-3 gap-2">
-                {[
-                  ["timebound","Time-Bound","Project with a defined end"],
-                  ["ongoing","Ongoing","Continuous, no fixed end date"],
-                  ["unknown","Unknown","Not yet determined"],
-                ].map(([v,l,s]) => (
-                  <button key={v} onClick={() => { setTime(v); setManBuilderHrs(null); setManConnectorHrs(null); setManAmplifierHrs(null); }}
-                    className="rounded-lg p-3 text-left transition-all"
-                    style={selBtn(time===v, v==="unknown"?"#7C5CBF":B.gold)}>
-                    <div className="font-semibold text-sm">{l}</div>
-                    <div className="text-xs mt-0.5" style={{ color: B.textDim }}>{s}</div>
+                {[["timebound","Time-Bound","Defined end date"],["ongoing","Ongoing","No fixed end date"],["unknown","Unknown","Not yet determined"]].map(([v,l,s]) => (
+                  <button key={v} onClick={() => { setTime(v); setManBuilderHrs(null); setManConnectorHrs(null); setManAmplifierHrs(null); }} className="rounded-lg p-3 text-left transition-all" style={selBtn(time===v, v==="unknown"?"#7C5CBF":B.gold)}>
+                    <div className="font-semibold text-sm">{l}</div><div className="text-xs mt-0.5" style={{ color:B.textDim }}>{s}</div>
                   </button>
                 ))}
               </div>
             </div>
-
-            {/* Engagement matrix visualization */}
-            <div className="rounded-xl overflow-hidden" style={{ border: `1px solid ${B.border2}` }}>
+            <div className="rounded-xl overflow-hidden" style={{ border:`1px solid ${B.border2}` }}>
               <div className="grid grid-cols-4 text-xs">
-                {/* Header row */}
-                <div style={{ background: B.surface2 }} className="p-2"></div>
-                {["Defined", "Flexible", "Unknown"].map(h => (
-                  <div key={h} style={{ background: B.surface2, borderLeft: `1px solid ${B.border2}`, color: B.textMuted }} className="p-2 text-center font-semibold">{h}</div>
-                ))}
-                {/* Data rows */}
-                {matrixData.slice(1).map((row, ri) => (
-                  row.map((cell, ci) => {
-                    if (ci === 0) {
-                      return <div key={`r${ri}`} style={{ background: B.surface2, borderTop: `1px solid ${B.border2}`, color: B.textMuted }} className="p-2 font-semibold flex items-center justify-center text-center">{cell}</div>;
-                    }
-                    const active = scope === cell.s && time === cell.t;
-                    return (
-                      <button key={`r${ri}c${ci}`}
-                        onClick={() => { setScope(cell.s); setTime(cell.t); setManBuilderHrs(null); setManConnectorHrs(null); setManAmplifierHrs(null); }}
-                        className="p-2.5 text-left transition-all"
-                        style={{ background: active ? cell.color+"22" : "#0D0D0D", borderTop: `1px solid ${B.border2}`, borderLeft: `1px solid ${B.border2}` }}>
-                        <div className="font-bold text-xs mb-0.5" style={{ color: active ? cell.color : B.textMuted }}>{cell.label}</div>
-                        <div className="text-xs" style={{ color: B.textDim }}>{cell.desc}</div>
-                      </button>
-                    );
-                  })
-                )).flat()}
+                {matrixData[0].map((h,i) => <div key={i} style={{ background:B.surface2, borderLeft:i>0?`1px solid ${B.border2}`:"none", color:B.textMuted }} className="p-2 text-center font-semibold">{h||""}</div>)}
+                {matrixData.slice(1).map((row,ri) => row.map((cell,ci) => {
+                  if (ci===0) return <div key={`r${ri}`} style={{ background:B.surface2, borderTop:`1px solid ${B.border2}`, color:B.textMuted }} className="p-2 font-semibold flex items-center justify-center text-center">{cell}</div>;
+                  const active = scope===cell.s && time===cell.t;
+                  return <button key={`r${ri}c${ci}`} onClick={() => { setScope(cell.s); setTime(cell.t); setManBuilderHrs(null); setManConnectorHrs(null); setManAmplifierHrs(null); }}
+                    className="p-2.5 text-left transition-all" style={{ background:active?cell.color+"22":"#0D0D0D", borderTop:`1px solid ${B.border2}`, borderLeft:`1px solid ${B.border2}` }}>
+                    <div className="font-bold text-xs mb-0.5" style={{ color:active?cell.color:B.textMuted }}>{cell.label}</div>
+                    <div className="text-xs" style={{ color:B.textDim }}>{cell.desc}</div>
+                  </button>;
+                })).flat()}
               </div>
             </div>
-
-            {/* Engagement result badge */}
             {hasEngagement && engCell && (
-              <div className="mt-3 p-3 rounded-lg flex items-center gap-3" style={{ background: engCell.color+"15", border: `1px solid ${engCell.color}44` }}>
-                <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: engCell.color }}></div>
-                <div>
-                  <div className="text-sm font-bold" style={{ color: engCell.color }}>{engCell.label}</div>
-                  <div className="text-xs" style={{ color: B.textMuted }}>{engCell.desc} — {engCell.value}</div>
-                </div>
+              <div className="mt-3 p-3 rounded-lg flex items-center gap-3" style={{ background:engCell.color+"15", border:`1px solid ${engCell.color}44` }}>
+                <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor:engCell.color }}></div>
+                <div><div className="text-sm font-bold" style={{ color:engCell.color }}>{engCell.label}</div><div className="text-xs" style={{ color:B.textMuted }}>{engCell.desc} — {engCell.value}</div></div>
               </div>
             )}
-
             {isIdeation && (
-              <div className="mt-4 pt-4" style={{ borderTop: `1px solid ${B.border2}` }}>
-                <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: B.textMuted }}>Duration (sprint-aligned)</div>
+              <div className="mt-4 pt-4" style={{ borderTop:`1px solid ${B.border2}` }}>
+                <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color:B.textMuted }}>Duration (sprint-aligned)</div>
                 <div className="grid grid-cols-6 gap-1">{[2,4,6,8,10,12].map(w => (
-                  <button key={w} onClick={() => setDuration(w)}
-                    className="py-2 rounded-lg text-sm font-bold transition-all" style={selBtn(duration===w, "#7C5CBF")}>{w}w</button>
+                  <button key={w} onClick={() => setDuration(w)} className="py-2 rounded-lg text-sm font-bold transition-all" style={selBtn(duration===w, "#7C5CBF")}>{w}w</button>
                 ))}</div>
               </div>
             )}
           </Card>
 
-          {/* STEP 3 */}
+          {/* STEP 3: Pillars */}
           <Card>
-            <div className="flex items-center gap-2 mb-4">
-              <StepBadge n="3" />
-              <h2 className="font-semibold text-white">Score the Six Pillars</h2>
-            </div>
+            <div className="flex items-center gap-2 mb-4"><StepBadge n="3" /><h2 className="font-semibold text-white">Score the Six Pillars</h2></div>
             {PILLARS.map(p => <PillarCard key={p.id} pillar={p} value={scores[p.id]} onChange={setScore}/>)}
           </Card>
 
@@ -550,156 +442,73 @@ export default function App() {
           {!isExecution && allScored && hasEngagement && (
             <Card>
               <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <StepBadge n="4" />
-                  <h2 className="font-semibold text-white">Resourcing — Hours / {isIdeation ? "Sprint" : "Month"}</h2>
-                </div>
-                {anyDiff && (
-                  <button onClick={() => { setManBuilderHrs(null); setManConnectorHrs(null); setManAmplifierHrs(null); }}
-                    className="text-xs px-2 py-1 rounded" style={{ color: B.gold, background: B.gold+"18", border: `1px solid ${B.gold}44` }}>
-                    ↺ Reset to recommended
-                  </button>
-                )}
+                <div className="flex items-center gap-2"><StepBadge n="4" /><h2 className="font-semibold text-white">Resourcing — Hours / {isIdeation?"Sprint":"Month"}</h2></div>
+                {anyDiff && <button onClick={() => { setManBuilderHrs(null); setManConnectorHrs(null); setManAmplifierHrs(null); }} className="text-xs px-2 py-1 rounded" style={{ color:B.gold, background:B.gold+"18", border:`1px solid ${B.gold}44` }}>↺ Reset</button>}
               </div>
-              <p className="text-xs mb-4 ml-8" style={{ color: B.textDim }}>Hours are calculated from your pillar scores. Override any value below.</p>
+              <p className="text-xs mb-4 ml-8" style={{ color:B.textDim }}>Hours calculated from pillar scores. Override below.</p>
               <div className="mb-4">
-                <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: B.textMuted }}>Number of Builders</div>
-                <div className="flex gap-2">{[1,2,3,4].map(n => (
-                  <button key={n} onClick={() => { setNumBuilders(n); setManBuilderHrs(null); }} className="flex-1 py-2 rounded-lg text-sm font-bold transition-all" style={selBtn(numBuilders===n, B.gold)}>{n}</button>
-                ))}</div>
+                <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color:B.textMuted }}>Number of Builders</div>
+                <div className="flex gap-2">{[1,2,3,4].map(n => <button key={n} onClick={() => { setNumBuilders(n); setManBuilderHrs(null); }} className="flex-1 py-2 rounded-lg text-sm font-bold transition-all" style={selBtn(numBuilders===n, B.gold)}>{n}</button>)}</div>
               </div>
-              <HrsTypeInput label="Builder" value={builderHrs} recommended={recBuilderHrs}
-                onChange={v => setManBuilderHrs(v)} rate={builderRate} color={ROLE_COLORS.Builder} breakdownLabel={builderBreakdown} />
-              <HrsTypeInput label="Connector" value={connectorHrs} recommended={recConnectorHrs}
-                onChange={v => setManConnectorHrs(v)} rate={RATES.connector} color={ROLE_COLORS.Connector} breakdownLabel={connBreakdown} />
-              <HrsTypeInput label="Amplifier" value={amplifierHrs} recommended={recAmplifierHrs}
-                onChange={v => setManAmplifierHrs(v)} rate={RATES.amplifier} color={ROLE_COLORS.Amplifier} breakdownLabel={ampBreakdown} />
-              <div className="mt-3 flex items-center justify-between rounded-lg px-3 py-2" style={{ background: B.border2 }}>
-                <div className="text-xs font-semibold text-white">Total Hours</div>
-                <div className="text-xs font-black text-white">{totalHrs} hrs/{isIdeation?"sprint":"mo"}</div>
-              </div>
+              <HrsTypeInput label="Builder" value={builderHrs} recommended={recBuilderHrs} onChange={v=>setManBuilderHrs(v)} rate={builderRate} color={ROLE_COLORS.Builder} breakdownLabel={builderBreakdown}/>
+              <HrsTypeInput label="Connector" value={connectorHrs} recommended={recConnectorHrs} onChange={v=>setManConnectorHrs(v)} rate={RATES.connector} color={ROLE_COLORS.Connector} breakdownLabel={connBreakdown}/>
+              <HrsTypeInput label="Amplifier" value={amplifierHrs} recommended={recAmplifierHrs} onChange={v=>setManAmplifierHrs(v)} rate={RATES.amplifier} color={ROLE_COLORS.Amplifier} breakdownLabel={ampBreakdown}/>
+              <div className="mt-3 flex items-center justify-between rounded-lg px-3 py-2" style={{ background:B.border2 }}><div className="text-xs font-semibold text-white">Total Hours</div><div className="text-xs font-black text-white">{totalHrs} hrs/{isIdeation?"sprint":"mo"}</div></div>
             </Card>
           )}
 
           {/* STEP 4: Hours (execution) */}
           {isExecution && allScored && hasEngagement && (
             <Card>
-              <div className="flex items-center gap-2 mb-4">
-                <StepBadge n="4" />
-                <h2 className="font-semibold text-white">Estimated Implementation Hours</h2>
-              </div>
+              <div className="flex items-center gap-2 mb-4"><StepBadge n="4" /><h2 className="font-semibold text-white">Estimated Implementation Hours</h2></div>
               <HrsTypeInput label="Builder" value={exBuilderHrs} onChange={setExBuilderHrs} rate={RATES.builderEx} color={ROLE_COLORS.Builder} breakdownLabel="Execution project estimate"/>
               <HrsTypeInput label="Connector" value={exConnectorHrs} onChange={setExConnectorHrs} rate={RATES.connector} color={ROLE_COLORS.Connector} breakdownLabel="Execution project estimate"/>
-              <button onClick={() => { setShowAmplifier(!showAmplifier); if(showAmplifier) setExAmplifierHrs(0); }}
-                className="w-full py-2 rounded-lg text-xs font-semibold transition-all mb-2" style={selBtn(showAmplifier, B.orange)}>
-                {showAmplifier?"− Remove Amplifier":"+ Add Amplifier (optional)"}
-              </button>
+              <button onClick={() => { setShowAmplifier(!showAmplifier); if(showAmplifier) setExAmplifierHrs(0); }} className="w-full py-2 rounded-lg text-xs font-semibold transition-all mb-2" style={selBtn(showAmplifier, B.orange)}>{showAmplifier?"− Remove Amplifier":"+ Add Amplifier"}</button>
               {showAmplifier && <HrsTypeInput label="Amplifier" value={exAmplifierHrs} onChange={setExAmplifierHrs} rate={RATES.amplifier} color={ROLE_COLORS.Amplifier} breakdownLabel="Execution project estimate"/>}
-              <div className="mt-3">
-                <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: B.textMuted }}>Complexity / Risk Buffer</div>
-                <div className="grid grid-cols-3 gap-2">{["Low","Medium","High"].map(b => (
-                  <button key={b} onClick={() => setRiskBuffer(b)} className="py-2 rounded-lg text-xs font-bold transition-all"
-                    style={selBtn(riskBuffer===b, b==="Low"?"#4ADE80":b==="Medium"?B.gold:B.orange)}>
-                    {b}<div className="text-xs opacity-70">+{RISK_BUFFERS[b]*100}%</div>
-                  </button>
-                ))}</div>
+              <div className="mt-3"><div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color:B.textMuted }}>Complexity / Risk Buffer</div>
+                <div className="grid grid-cols-3 gap-2">{["Low","Medium","High"].map(b => <button key={b} onClick={() => setRiskBuffer(b)} className="py-2 rounded-lg text-xs font-bold transition-all" style={selBtn(riskBuffer===b, b==="Low"?"#4ADE80":b==="Medium"?B.gold:B.orange)}>{b}<div className="text-xs opacity-70">+{RISK_BUFFERS[b]*100}%</div></button>)}</div>
               </div>
             </Card>
           )}
 
           {/* STEP 5: Discounts */}
-          <div className="rounded-xl p-5" style={{ background: B.surface, border: `1px solid ${B.border2}` }}>
+          <div className="rounded-xl p-5" style={{ background:B.surface, border:`1px solid ${B.border2}` }}>
             <button onClick={() => setShowDiscounts(!showDiscounts)} className="w-full flex items-center justify-between">
-              <div className="flex items-center gap-2 flex-wrap">
-                <StepBadge n="5" />
-                <h2 className="font-semibold text-white">Discounts & Incentives</h2>
-                {discountBadgeText && (
-                  <span className="text-xs px-2 py-0.5 rounded-full" style={{ background:"#14532D44", border:"1px solid #166534", color:"#4ADE80" }}>
-                    {discountBadgeText} applied
-                  </span>
-                )}
+              <div className="flex items-center gap-2 flex-wrap"><StepBadge n="5" /><h2 className="font-semibold text-white">Discounts & Incentives</h2>
+                {discountBadgeText && <span className="text-xs px-2 py-0.5 rounded-full" style={{ background:"#14532D44", border:"1px solid #166534", color:"#4ADE80" }}>{discountBadgeText} applied</span>}
                 {needsApproval && <span className="text-xs px-2 py-0.5 rounded-full" style={{ background:B.orange+"22", border:`1px solid ${B.orange}66`, color:B.orange }}>⚠ Approval required</span>}
               </div>
-              <span className="text-xs" style={{ color: B.textDim }}>{showDiscounts?"▲":"▼"}</span>
+              <span className="text-xs" style={{ color:B.textDim }}>{showDiscounts?"▲":"▼"}</span>
             </button>
             {showDiscounts && (
               <div className="mt-4 space-y-5">
-                <div>
-                  <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: B.textMuted }}>Commitment Term</div>
-                  <div className="grid grid-cols-4 gap-2">
-                    {[["none","None","—"],["3mo","3 Month","5% off"],["6mo","6 Month","8% off"],["12mo","12 Month","12% off"]].map(([v,l,d]) => (
-                      <button key={v} onClick={() => { setCommitTerm(v); if(v==="none") setFreeMonths(0); }}
-                        className="rounded-lg p-2 text-center transition-all" style={selBtn(commitTerm===v, B.gold)}>
-                        <div className="font-semibold text-xs">{l}</div><div className="text-xs opacity-70">{d}</div>
-                      </button>
-                    ))}
-                  </div>
+                <div><div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color:B.textMuted }}>Commitment Term</div>
+                  <div className="grid grid-cols-4 gap-2">{[["none","None","—"],["3mo","3 Month","5% off"],["6mo","6 Month","8% off"],["12mo","12 Month","12% off"]].map(([v,l,d]) => (
+                    <button key={v} onClick={() => { setCommitTerm(v); if(v==="none") setFreeMonths(0); }} className="rounded-lg p-2 text-center transition-all" style={selBtn(commitTerm===v, B.gold)}><div className="font-semibold text-xs">{l}</div><div className="text-xs opacity-70">{d}</div></button>
+                  ))}</div>
                 </div>
-                {isRetainer && commitTerm !== "none" && (
-                  <div>
-                    <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: B.textMuted }}>Free Months</div>
+                {isRetainer && commitTerm!=="none" && (
+                  <div><div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color:B.textMuted }}>Free Months</div>
                     <div className="flex items-center gap-3">
-                      <input type="number" min={0} max={termMonths - 1} value={freeMonths}
-                        onChange={e => setFreeMonths(Math.min(termMonths - 1, Math.max(0, parseInt(e.target.value) || 0)))}
-                        className="w-20 rounded-lg px-3 py-2 text-sm text-white text-center font-bold focus:outline-none"
-                        style={{ background: B.surface2, border: `1px solid ${freeMonths > 0 ? "#4ADE8066" : B.border2}` }} />
-                      <div>
-                        <span className="text-xs" style={{ color: B.textMuted }}>free month{freeMonths !== 1 ? "s" : ""} in {commitTerm} term</span>
-                        {freeMonths > 0 && <div className="text-xs mt-0.5" style={{ color: "#4ADE80" }}>Client pays {paidMonths}, gets {termMonths}</div>}
-                      </div>
+                      <input type="number" min={0} max={termMonths-1} value={freeMonths} onChange={e => setFreeMonths(Math.min(termMonths-1, Math.max(0, parseInt(e.target.value)||0)))} className="w-20 rounded-lg px-3 py-2 text-sm text-white text-center font-bold focus:outline-none" style={{ background:B.surface2, border:`1px solid ${freeMonths>0?"#4ADE8066":B.border2}` }}/>
+                      <div><span className="text-xs" style={{ color:B.textMuted }}>free month{freeMonths!==1?"s":""} in {commitTerm} term</span>{freeMonths>0 && <div className="text-xs mt-0.5" style={{ color:"#4ADE80" }}>Client pays {paidMonths}, gets {termMonths}</div>}</div>
                     </div>
-                    {freeMonths > 0 && (
-                      <div className="mt-2 p-2 rounded-lg text-xs" style={{ background: "#14532D22", border: "1px solid #16653444", color: "#4ADE80" }}>
-                        Free month value: ${Math.round(freeMonthValue).toLocaleString()}
-                      </div>
-                    )}
+                    {freeMonths>0 && <div className="mt-2 p-2 rounded-lg text-xs" style={{ background:"#14532D22", border:"1px solid #16653444", color:"#4ADE80" }}>Free month value: ${Math.round(freeMonthValue).toLocaleString()}</div>}
                   </div>
                 )}
-                <div>
-                  <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: B.textMuted }}>New Client Discount</div>
+                <div><div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color:B.textMuted }}>New Client Discount</div>
                   <div className="flex items-center gap-3">
-                    <button onClick={() => setNewClient(!newClient)} className="px-4 py-2 rounded-lg text-xs font-semibold transition-all"
-                      style={selBtn(newClient, "#4ADE80")}>{newClient?"✓ Applied":"Apply"}</button>
-                    {newClient && (
-                      <div className="flex items-center gap-2">
-                        <input type="number" min={0} max={20} value={newClientPct}
-                          onChange={e => setNewClientPct(Math.min(20,Math.max(0,parseInt(e.target.value)||0)))}
-                          className="w-16 rounded-lg px-2 py-1 text-sm text-white text-center focus:outline-none"
-                          style={{ background: B.surface2, border: `1px solid ${B.border2}` }}/>
-                        <span className="text-xs" style={{ color: B.textMuted }}>%</span>
-                      </div>
-                    )}
+                    <button onClick={() => setNewClient(!newClient)} className="px-4 py-2 rounded-lg text-xs font-semibold transition-all" style={selBtn(newClient, "#4ADE80")}>{newClient?"✓ Applied":"Apply"}</button>
+                    {newClient && <div className="flex items-center gap-2"><input type="number" min={0} max={20} value={newClientPct} onChange={e => setNewClientPct(Math.min(20,Math.max(0,parseInt(e.target.value)||0)))} className="w-16 rounded-lg px-2 py-1 text-sm text-white text-center focus:outline-none" style={{ background:B.surface2, border:`1px solid ${B.border2}` }}/><span className="text-xs" style={{ color:B.textMuted }}>%</span></div>}
                   </div>
                 </div>
-                {isRetainer && (
-                  <div>
-                    <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: B.textMuted }}>Volume Discount <span style={{ color:B.textDim, textTransform:"none", fontWeight:"normal" }}>(auto-applied)</span></div>
-                    <div className="grid grid-cols-4 gap-1">{VOLUME_DISCOUNTS.map(v => {
-                      const active=totalHrs>=v.min&&totalHrs<=v.max;
-                      return <div key={v.label} className="rounded-lg p-2 text-center text-xs"
-                        style={{ border:`1px solid ${active?"#166534":B.border}`, background:active?"#14532D44":B.surface2, color:active?"#4ADE80":B.textDim }}>
-                        <div className="font-semibold">{v.label}</div><div>{v.pct>0?`${v.pct*100}%`:"No disc."}</div>
-                        {active && <div className="text-xs mt-0.5">← current</div>}
-                      </div>;
-                    })}</div>
-                  </div>
-                )}
-                <div>
-                  <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: B.textMuted }}>Manual Override %</div>
-                  <div className="flex items-center gap-3">
-                    <input type="number" min={0} max={50} value={manualDiscount}
-                      onChange={e => setManualDiscount(Math.min(50,Math.max(0,parseInt(e.target.value)||0)))}
-                      className="w-20 rounded-lg px-3 py-2 text-sm text-white text-center focus:outline-none"
-                      style={{ background: B.surface2, border: `1px solid ${B.border2}` }}/>
-                    <span className="text-xs" style={{ color: B.textMuted }}>% additional discount</span>
-                  </div>
+                {isRetainer && <div><div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color:B.textMuted }}>Volume Discount <span style={{ color:B.textDim, textTransform:"none", fontWeight:"normal" }}>(auto)</span></div>
+                  <div className="grid grid-cols-4 gap-1">{VOLUME_DISCOUNTS.map(v => { const active=totalHrs>=v.min&&totalHrs<=v.max; return <div key={v.label} className="rounded-lg p-2 text-center text-xs" style={{ border:`1px solid ${active?"#166534":B.border}`, background:active?"#14532D44":B.surface2, color:active?"#4ADE80":B.textDim }}><div className="font-semibold">{v.label}</div><div>{v.pct>0?`${v.pct*100}%`:"—"}</div>{active && <div className="text-xs mt-0.5">← current</div>}</div>; })}</div>
+                </div>}
+                <div><div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color:B.textMuted }}>Manual Override %</div>
+                  <div className="flex items-center gap-3"><input type="number" min={0} max={50} value={manualDiscount} onChange={e => setManualDiscount(Math.min(50,Math.max(0,parseInt(e.target.value)||0)))} className="w-20 rounded-lg px-3 py-2 text-sm text-white text-center focus:outline-none" style={{ background:B.surface2, border:`1px solid ${B.border2}` }}/><span className="text-xs" style={{ color:B.textMuted }}>% additional</span></div>
                 </div>
-                {needsApproval && (
-                  <div className="p-3 rounded-lg" style={{ background:B.orange+"18", border:`1px solid ${B.orange}55` }}>
-                    <div className="text-xs font-bold mb-1" style={{ color:B.orange }}>⚠ Manager Approval Required</div>
-                    <div className="text-xs" style={{ color:"#FCA98A" }}>Effective discount of {(discountEquivPct*100).toFixed(1)}% exceeds 10% threshold.</div>
-                  </div>
-                )}
+                {needsApproval && <div className="p-3 rounded-lg" style={{ background:B.orange+"18", border:`1px solid ${B.orange}55` }}><div className="text-xs font-bold mb-1" style={{ color:B.orange }}>⚠ Manager Approval Required</div><div className="text-xs" style={{ color:"#FCA98A" }}>Effective discount {(discountEquivPct*100).toFixed(1)}% exceeds 10% threshold.</div></div>}
               </div>
             )}
           </div>
@@ -707,144 +516,55 @@ export default function App() {
 
         {/* RIGHT COLUMN */}
         <div className="lg:sticky lg:top-4 lg:self-start">
-          <div className="rounded-xl p-5" style={{ background: B.surface, border: `1px solid ${B.border2}` }}>
-            <h2 className="font-semibold text-white mb-4 flex items-center gap-2">
-              <span style={{ color: B.gold }}>◆</span> Internal Pricing Output
-            </h2>
+          <div className="rounded-xl p-5" style={{ background:B.surface, border:`1px solid ${B.border2}` }}>
+            <h2 className="font-semibold text-white mb-4 flex items-center gap-2"><span style={{ color:B.gold }}>◆</span> Internal Pricing Output</h2>
             {(!allScored||!hasEngagement) ? (
               <div className="text-center py-10">
                 <div className="text-4xl mb-3">📋</div>
-                <div className="text-sm mb-4" style={{ color: B.textMuted }}>Complete the diagnostic to generate your recommendation</div>
+                <div className="text-sm mb-4" style={{ color:B.textMuted }}>Complete the diagnostic to generate your recommendation</div>
                 <div className="space-y-2">
                   {[[hasEngagement,"Engagement Type Selected"],[allScored,`All 6 Pillars Scored (${Object.keys(scores).length}/6)`]].map(([done,label],i) => (
-                    <div key={i} className="flex items-center gap-2 text-xs px-3 py-2 rounded-lg"
-                      style={{ background:done?"#14532D44":B.surface2, border:`1px solid ${done?"#166534":B.border}`, color:done?"#4ADE80":B.textDim }}>
-                      {done?"✓":"○"} {label}
-                    </div>
+                    <div key={i} className="flex items-center gap-2 text-xs px-3 py-2 rounded-lg" style={{ background:done?"#14532D44":B.surface2, border:`1px solid ${done?"#166534":B.border}`, color:done?"#4ADE80":B.textDim }}>{done?"✓":"○"} {label}</div>
                   ))}
                 </div>
               </div>
             ) : (
               <div>
-                {engCell && (
-                  <div className="rounded-xl p-4 mb-4" style={{ background:engCell.color+"11", border:`1px solid ${engCell.color}44` }}>
-                    <div className="text-xs uppercase tracking-widest mb-1" style={{ color:B.textMuted }}>Devon Values</div>
-                    <div className="font-bold text-white">{engCell.value}</div>
-                    <div className="text-xs mt-1" style={{ color:B.textMuted }}>
-                      {engCell.label} · {scope==="unknown"?"Unknown":scope==="defined"?"Defined":"Flexible"} scope · {time==="unknown"?"Unknown":time==="ongoing"?"Ongoing":"Time-bound"}
-                    </div>
-                  </div>
-                )}
-                {clientTierLabel && (
-                  <div className="rounded-xl p-5 mb-4" style={{ background:clientTierColor+"11", border:`1px solid ${clientTierColor}44` }}>
-                    <div className="text-xs uppercase tracking-widest mb-1" style={{ color:B.textMuted }}>
-                      {isOp?"Operational Package":isSt?"Strategic Package":isIdeation?"Ideation · Discovery":isExecution?"Execution · Fixed Bid":""}
-                    </div>
-                    <div className="text-3xl font-black mb-1" style={{ color:clientTierColor }}>{clientTierLabel}</div>
-                    <div className="text-sm" style={{ color:"#CCC" }}>{recTier?.desc||""}</div>
-                  </div>
-                )}
-                <div className="mb-4">
-                  <div className="text-xs uppercase tracking-widest mb-2" style={{ color: B.textDim }}>Pillar Score Summary</div>
-                  <div className="grid grid-cols-2 gap-2">
-                    {PILLARS.map(p => (
-                      <div key={p.id} className="flex items-center justify-between rounded-lg px-3 py-2" style={{ background:B.surface2 }}>
-                        <div><div className="text-xs font-medium text-white">{p.label}</div><div className="text-xs" style={{ color:B.textDim }}>{p.role}</div></div>
-                        <Chip v={scores[p.id]} />
-                      </div>
-                    ))}
-                  </div>
-                  <div className="mt-2 flex items-center justify-between rounded-lg px-3 py-2" style={{ background:B.surface2 }}>
-                    <div className="text-xs font-semibold text-white">Pillar Multiplier</div>
-                    <div className="text-sm font-black" style={{ color:B.gold }}>{avgMult?.toFixed(3)}x</div>
-                  </div>
+                {engCell && <div className="rounded-xl p-4 mb-4" style={{ background:engCell.color+"11", border:`1px solid ${engCell.color}44` }}><div className="text-xs uppercase tracking-widest mb-1" style={{ color:B.textMuted }}>Devon Values</div><div className="font-bold text-white">{engCell.value}</div><div className="text-xs mt-1" style={{ color:B.textMuted }}>{engCell.label} · {scope==="unknown"?"Unknown":scope==="defined"?"Defined":"Flexible"} · {time==="unknown"?"Unknown":time==="ongoing"?"Ongoing":"Time-bound"}</div></div>}
+                {clientTierLabel && <div className="rounded-xl p-5 mb-4" style={{ background:clientTierColor+"11", border:`1px solid ${clientTierColor}44` }}><div className="text-xs uppercase tracking-widest mb-1" style={{ color:B.textMuted }}>{isOp?"Operational Package":isSt?"Strategic Package":isIdeation?"Ideation · Discovery":"Execution · Fixed Bid"}</div><div className="text-3xl font-black mb-1" style={{ color:clientTierColor }}>{clientTierLabel}</div><div className="text-sm" style={{ color:"#CCC" }}>{recTier?.desc||""}</div></div>}
+
+                <div className="mb-4"><div className="text-xs uppercase tracking-widest mb-2" style={{ color:B.textDim }}>Pillar Score Summary</div>
+                  <div className="grid grid-cols-2 gap-2">{PILLARS.map(p => <div key={p.id} className="flex items-center justify-between rounded-lg px-3 py-2" style={{ background:B.surface2 }}><div><div className="text-xs font-medium text-white">{p.label}</div><div className="text-xs" style={{ color:B.textDim }}>{p.role}</div></div><Chip v={scores[p.id]}/></div>)}</div>
+                  <div className="mt-2 flex items-center justify-between rounded-lg px-3 py-2" style={{ background:B.surface2 }}><div className="text-xs font-semibold text-white">Pillar Multiplier</div><div className="text-sm font-black" style={{ color:B.gold }}>{avgMult?.toFixed(3)}x</div></div>
                 </div>
 
                 {anyDiff && !isExecution && (
-                  <div className="mb-4 rounded-xl overflow-hidden" style={{ border: `1px solid ${B.gold}44` }}>
-                    <div className="px-3 py-2 text-xs font-semibold uppercase tracking-widest" style={{ background: B.gold+"18", color: B.gold }}>
-                      Recommended vs Your Adjustments
-                    </div>
-                    <div className="grid grid-cols-4 text-xs" style={{ background: B.surface2 }}>
-                      <div className="px-3 py-2 font-semibold" style={{ color: B.textMuted, borderBottom: `1px solid ${B.border}` }}>Role</div>
-                      <div className="px-3 py-2 font-semibold text-center" style={{ color: B.textMuted, borderBottom: `1px solid ${B.border}`, borderLeft: `1px solid ${B.border}` }}>Rec.</div>
-                      <div className="px-3 py-2 font-semibold text-center" style={{ color: B.gold, borderBottom: `1px solid ${B.border}`, borderLeft: `1px solid ${B.border}` }}>Yours</div>
-                      <div className="px-3 py-2 font-semibold text-center" style={{ color: B.textMuted, borderBottom: `1px solid ${B.border}`, borderLeft: `1px solid ${B.border}` }}>Δ</div>
-                      {[
-                        { role: "Builder", color: ROLE_COLORS.Builder, rec: recBuilderHrs, cur: builderHrs },
-                        { role: "Connector", color: ROLE_COLORS.Connector, rec: recConnectorHrs, cur: connectorHrs },
-                        { role: "Amplifier", color: ROLE_COLORS.Amplifier, rec: recAmplifierHrs, cur: amplifierHrs },
-                      ].filter(r => r.rec > 0 || r.cur > 0).map(r => {
-                        const d = r.cur - r.rec;
-                        return (
-                          <React.Fragment key={r.role}>
-                            <div className="px-3 py-2 flex items-center gap-1.5" style={{ borderBottom: `1px solid ${B.border}` }}>
-                              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: r.color }}></div>
-                              <span className="text-white">{r.role}</span>
-                            </div>
-                            <div className="px-3 py-2 text-center" style={{ color: B.textMuted, borderBottom: `1px solid ${B.border}`, borderLeft: `1px solid ${B.border}` }}>{r.rec}h</div>
-                            <div className="px-3 py-2 text-center font-bold" style={{ color: B.text, borderBottom: `1px solid ${B.border}`, borderLeft: `1px solid ${B.border}` }}>{r.cur}h</div>
-                            <div className="px-3 py-2 text-center font-bold" style={{ color: d===0?B.textDim:d>0?B.orange:"#4ADE80", borderBottom: `1px solid ${B.border}`, borderLeft: `1px solid ${B.border}` }}>
-                              {d===0?"—":d>0?`+${d}`:d}
-                            </div>
-                          </React.Fragment>
-                        );
-                      })}
+                  <div className="mb-4 rounded-xl overflow-hidden" style={{ border:`1px solid ${B.gold}44` }}>
+                    <div className="px-3 py-2 text-xs font-semibold uppercase tracking-widest" style={{ background:B.gold+"18", color:B.gold }}>Recommended vs Yours</div>
+                    <div className="grid grid-cols-4 text-xs" style={{ background:B.surface2 }}>
+                      <div className="px-3 py-2 font-semibold" style={{ color:B.textMuted, borderBottom:`1px solid ${B.border}` }}>Role</div>
+                      <div className="px-3 py-2 font-semibold text-center" style={{ color:B.textMuted, borderBottom:`1px solid ${B.border}`, borderLeft:`1px solid ${B.border}` }}>Rec.</div>
+                      <div className="px-3 py-2 font-semibold text-center" style={{ color:B.gold, borderBottom:`1px solid ${B.border}`, borderLeft:`1px solid ${B.border}` }}>Yours</div>
+                      <div className="px-3 py-2 font-semibold text-center" style={{ color:B.textMuted, borderBottom:`1px solid ${B.border}`, borderLeft:`1px solid ${B.border}` }}>Δ</div>
+                      {[{role:"Builder",color:ROLE_COLORS.Builder,rec:recBuilderHrs,cur:builderHrs},{role:"Connector",color:ROLE_COLORS.Connector,rec:recConnectorHrs,cur:connectorHrs},{role:"Amplifier",color:ROLE_COLORS.Amplifier,rec:recAmplifierHrs,cur:amplifierHrs}].filter(r=>r.rec>0||r.cur>0).map(r=>{const d=r.cur-r.rec;return(<React.Fragment key={r.role}><div className="px-3 py-2 flex items-center gap-1.5" style={{ borderBottom:`1px solid ${B.border}` }}><div className="w-2 h-2 rounded-full" style={{ backgroundColor:r.color }}></div><span className="text-white">{r.role}</span></div><div className="px-3 py-2 text-center" style={{ color:B.textMuted, borderBottom:`1px solid ${B.border}`, borderLeft:`1px solid ${B.border}` }}>{r.rec}h</div><div className="px-3 py-2 text-center font-bold" style={{ color:B.text, borderBottom:`1px solid ${B.border}`, borderLeft:`1px solid ${B.border}` }}>{r.cur}h</div><div className="px-3 py-2 text-center font-bold" style={{ color:d===0?B.textDim:d>0?B.orange:"#4ADE80", borderBottom:`1px solid ${B.border}`, borderLeft:`1px solid ${B.border}` }}>{d===0?"—":d>0?`+${d}`:d}</div></React.Fragment>);})}
                       <div className="px-3 py-2 font-bold text-white">Total</div>
-                      <div className="px-3 py-2 text-center font-bold" style={{ color: B.textMuted, borderLeft: `1px solid ${B.border}` }}>{recTotalHrs}h</div>
-                      <div className="px-3 py-2 text-center font-bold" style={{ color: B.text, borderLeft: `1px solid ${B.border}` }}>{totalHrs}h</div>
-                      <div className="px-3 py-2 text-center font-bold" style={{ color: totalHrs-recTotalHrs===0?B.textDim:totalHrs-recTotalHrs>0?B.orange:"#4ADE80", borderLeft: `1px solid ${B.border}` }}>
-                        {totalHrs-recTotalHrs===0?"—":totalHrs-recTotalHrs>0?`+${totalHrs-recTotalHrs}`:totalHrs-recTotalHrs}
-                      </div>
+                      <div className="px-3 py-2 text-center font-bold" style={{ color:B.textMuted, borderLeft:`1px solid ${B.border}` }}>{recTotalHrs}h</div>
+                      <div className="px-3 py-2 text-center font-bold" style={{ color:B.text, borderLeft:`1px solid ${B.border}` }}>{totalHrs}h</div>
+                      <div className="px-3 py-2 text-center font-bold" style={{ color:totalHrs-recTotalHrs===0?B.textDim:totalHrs-recTotalHrs>0?B.orange:"#4ADE80", borderLeft:`1px solid ${B.border}` }}>{totalHrs-recTotalHrs===0?"—":totalHrs-recTotalHrs>0?`+${totalHrs-recTotalHrs}`:totalHrs-recTotalHrs}</div>
                     </div>
-                    <div className="grid grid-cols-2 text-xs" style={{ borderTop: `1px solid ${B.gold}33` }}>
-                      <div className="px-3 py-2.5" style={{ background: B.surface2 }}>
-                        <div className="font-semibold mb-0.5" style={{ color: B.textMuted }}>Recommended</div>
-                        <div className="text-sm font-bold text-white">${Math.round((avgMult?recBaseInv*avgMult:recBaseInv)/100)*100}</div>
-                        <div style={{ color: B.textDim }}>{isRetainer?"/mo":"total"}</div>
-                      </div>
-                      <div className="px-3 py-2.5" style={{ background: B.gold+"0D", borderLeft: `1px solid ${B.gold}33` }}>
-                        <div className="font-semibold mb-0.5" style={{ color: B.gold }}>Your Adjustments</div>
-                        <div className="text-sm font-bold" style={{ color: B.gold }}>${Math.round(afterMult/100)*100}</div>
-                        <div style={{ color: B.textDim }}>
-                          {isRetainer?"/mo":"total"} ({(() => {
-                            const recR = Math.round((avgMult?recBaseInv*avgMult:recBaseInv)/100)*100;
-                            const curR = Math.round(afterMult/100)*100;
-                            const d = curR-recR;
-                            return d===0?"no change":d>0?`+$${d.toLocaleString()}`:`-$${Math.abs(d).toLocaleString()}`;
-                          })()})
-                        </div>
-                      </div>
+                    <div className="grid grid-cols-2 text-xs" style={{ borderTop:`1px solid ${B.gold}33` }}>
+                      <div className="px-3 py-2.5" style={{ background:B.surface2 }}><div className="font-semibold mb-0.5" style={{ color:B.textMuted }}>Recommended</div><div className="text-sm font-bold text-white">${Math.round((avgMult?recBaseInv*avgMult:recBaseInv)/100)*100}</div><div style={{ color:B.textDim }}>{isRetainer?"/mo":"total"}</div></div>
+                      <div className="px-3 py-2.5" style={{ background:B.gold+"0D", borderLeft:`1px solid ${B.gold}33` }}><div className="font-semibold mb-0.5" style={{ color:B.gold }}>Yours</div><div className="text-sm font-bold" style={{ color:B.gold }}>${Math.round(afterMult/100)*100}</div><div style={{ color:B.textDim }}>{isRetainer?"/mo":"total"} ({(()=>{const r=Math.round((avgMult?recBaseInv*avgMult:recBaseInv)/100)*100,c=Math.round(afterMult/100)*100,d=c-r;return d===0?"no change":d>0?`+$${d.toLocaleString()}`:`-$${Math.abs(d).toLocaleString()}`;})()})</div></div>
                     </div>
                   </div>
                 )}
 
-                <div className="mb-4">
-                  <div className="text-xs uppercase tracking-widest mb-2" style={{ color: B.textDim }}>Internal Resourcing</div>
+                <div className="mb-4"><div className="text-xs uppercase tracking-widest mb-2" style={{ color:B.textDim }}>Internal Resourcing</div>
                   <div className="space-y-2">
-                    {[
-                      { role:"Builder", color:ROLE_COLORS.Builder, sub:`${numBuilders} builder${numBuilders>1?"s":""} · Pred(${predScore||"–"}) + DV(${dvScore||"–"})`, hrs:builderHrs, rate:builderRate, show:true },
-                      { role:"Connector", color:ROLE_COLORS.Connector, sub:`Pres(${scores.presence||"–"})/Clar(${scores.clarity||"–"}) → ${connScore||"–"}`, hrs:connectorHrs, rate:RATES.connector, show:connectorHrs>0 },
-                      { role:"Amplifier", color:ROLE_COLORS.Amplifier, sub:`Strat(${scores.strategicGuidance||"–"})/Champ(${scores.championing||"–"}) → ${ampScore||"–"}`, hrs:amplifierHrs, rate:RATES.amplifier, show:amplifierHrs>0 },
-                    ].filter(r=>r.show).map(r => (
-                      <div key={r.role} className="flex items-center justify-between rounded-lg px-3 py-2" style={{ background:B.surface2 }}>
-                        <div className="flex items-center gap-2">
-                          <div className="w-2 h-2 rounded-full" style={{ backgroundColor:r.color }}></div>
-                          <div><div className="text-xs font-medium text-white">{r.role}</div><div className="text-xs" style={{ color:B.textDim }}>{r.sub}</div></div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-xs font-bold text-white">{r.hrs} hrs</div>
-                          <div className="text-xs" style={{ color:B.textDim }}>${r.rate}/hr · {isProject?"total":"/mo"}</div>
-                        </div>
-                      </div>
+                    {[{role:"Builder",color:ROLE_COLORS.Builder,sub:`${numBuilders} builder${numBuilders>1?"s":""} · Pred(${predScore||"–"})+DV(${dvScore||"–"})`,hrs:builderHrs,rate:builderRate,show:true},{role:"Connector",color:ROLE_COLORS.Connector,sub:`Pres(${scores.presence||"–"})/Clar(${scores.clarity||"–"})→${connScore||"–"}`,hrs:connectorHrs,rate:RATES.connector,show:connectorHrs>0},{role:"Amplifier",color:ROLE_COLORS.Amplifier,sub:`Strat(${scores.strategicGuidance||"–"})/Champ(${scores.championing||"–"})→${ampScore||"–"}`,hrs:amplifierHrs,rate:RATES.amplifier,show:amplifierHrs>0}].filter(r=>r.show).map(r=>(
+                      <div key={r.role} className="flex items-center justify-between rounded-lg px-3 py-2" style={{ background:B.surface2 }}><div className="flex items-center gap-2"><div className="w-2 h-2 rounded-full" style={{ backgroundColor:r.color }}></div><div><div className="text-xs font-medium text-white">{r.role}</div><div className="text-xs" style={{ color:B.textDim }}>{r.sub}</div></div></div><div className="text-right"><div className="text-xs font-bold text-white">{r.hrs} hrs</div><div className="text-xs" style={{ color:B.textDim }}>${r.rate}/hr · {isProject?"total":"/mo"}</div></div></div>
                     ))}
-                    <div className="flex items-center justify-between rounded-lg px-3 py-2" style={{ background:B.border2 }}>
-                      <div className="text-xs font-semibold text-white">Total Hours</div>
-                      <div className="text-right">
-                        <div className="text-xs font-black text-white">{totalHrs} hrs {isProject?"total":"/mo"}</div>
-                        <div className="text-xs" style={{ color:B.textMuted }}>Blended: ${blendedRate}/hr</div>
-                      </div>
-                    </div>
+                    <div className="flex items-center justify-between rounded-lg px-3 py-2" style={{ background:B.border2 }}><div className="text-xs font-semibold text-white">Total Hours</div><div className="text-right"><div className="text-xs font-black text-white">{totalHrs} hrs {isProject?"total":"/mo"}</div><div className="text-xs" style={{ color:B.textMuted }}>Blended: ${blendedRate}/hr</div></div></div>
                   </div>
                 </div>
 
@@ -853,49 +573,29 @@ export default function App() {
                   <div className="flex justify-between text-xs"><span style={{ color:B.textMuted }}>Base (hours × rates)</span><span className="text-white">${baseInv.toLocaleString()}</span></div>
                   <div className="flex justify-between text-xs"><span style={{ color:B.textMuted }}>Pillar multiplier ({avgMult?.toFixed(3)}x)</span><span className="text-white">${Math.round(afterMult).toLocaleString()}{isRetainer?"/mo":""}</span></div>
                   {isExecution && <div className="flex justify-between text-xs"><span style={{ color:B.textMuted }}>Risk buffer (+{RISK_BUFFERS[riskBuffer]*100}%)</span><span className="text-white">${Math.round(afterRisk).toLocaleString()}</span></div>}
-                  {(pctDiscTotal>0||freeMonths>0) && (
-                    <div className="pt-1 mt-1 space-y-1" style={{ borderTop:`1px solid ${B.border2}` }}>
-                      {commitDiscPct>0 && <div className="flex justify-between text-xs"><span className="text-green-400">Commit discount ({commitTerm})</span><span className="text-green-400">−{(commitDiscPct*100).toFixed(0)}%</span></div>}
-                      {freeMonths>0 && <div className="flex justify-between text-xs"><span className="text-green-400">{freeMonths} free month{freeMonths!==1?"s":""} (pay {paidMonths} get {termMonths})</span><span className="text-green-400">−${Math.round(freeMonthValue).toLocaleString()}</span></div>}
-                      {newClientDisc>0 && <div className="flex justify-between text-xs"><span className="text-green-400">New client discount</span><span className="text-green-400">−{(newClientDisc*100).toFixed(0)}%</span></div>}
-                      {volDisc>0 && <div className="flex justify-between text-xs"><span className="text-green-400">Volume discount</span><span className="text-green-400">−{(volDisc*100).toFixed(0)}%</span></div>}
-                      {manualDisc>0 && <div className="flex justify-between text-xs"><span className="text-green-400">Manual override</span><span className="text-green-400">−{(manualDisc*100).toFixed(0)}%</span></div>}
-                    </div>
-                  )}
-                  {isRetainer&&commitTerm!=="none" && (
-                    <div className="pt-2 mt-1 space-y-1" style={{ borderTop:`1px solid ${B.border2}` }}>
-                      <div className="flex justify-between text-xs"><span style={{ color:B.textMuted }}>Monthly investment</span><span className="text-white">${finalMonthly.toLocaleString()}/mo</span></div>
-                      <div className="flex justify-between text-xs"><span style={{ color:B.textMuted }}>{commitTerm} term ({paidMonths} paid{freeMonths>0?` + ${freeMonths} free`:""})</span><span className="text-white">${finalTermTotal?.toLocaleString()}</span></div>
-                      <div className="flex justify-between text-xs font-bold"><span className="text-white">Hours delivered ({commitTerm})</span><span className="text-white">{termHrsDelivered.toLocaleString()} hrs</span></div>
-                    </div>
-                  )}
-                  <div className="flex justify-between text-xs font-bold pt-2 mt-1 rounded px-2 py-1"
-                    style={{ borderTop:`1px solid ${B.border2}`, background:needsApproval?B.orange+"22":B.border2, color:needsApproval?B.orange:B.gold }}>
-                    <span>Effective blended rate{isRetainer&&commitTerm!=="none"?` (${commitTerm})`:""}</span>
-                    <span>${effectiveBlendedRate}/hr {needsApproval?"⚠":""}</span>
-                  </div>
+                  {(pctDiscTotal>0||freeMonths>0) && <div className="pt-1 mt-1 space-y-1" style={{ borderTop:`1px solid ${B.border2}` }}>
+                    {commitDiscPct>0 && <div className="flex justify-between text-xs"><span className="text-green-400">Commit ({commitTerm})</span><span className="text-green-400">−{(commitDiscPct*100).toFixed(0)}%</span></div>}
+                    {freeMonths>0 && <div className="flex justify-between text-xs"><span className="text-green-400">{freeMonths} free mo (pay {paidMonths} get {termMonths})</span><span className="text-green-400">−${Math.round(freeMonthValue).toLocaleString()}</span></div>}
+                    {newClientDisc>0 && <div className="flex justify-between text-xs"><span className="text-green-400">New client</span><span className="text-green-400">−{(newClientDisc*100).toFixed(0)}%</span></div>}
+                    {volDisc>0 && <div className="flex justify-between text-xs"><span className="text-green-400">Volume</span><span className="text-green-400">−{(volDisc*100).toFixed(0)}%</span></div>}
+                    {manualDisc>0 && <div className="flex justify-between text-xs"><span className="text-green-400">Manual</span><span className="text-green-400">−{(manualDisc*100).toFixed(0)}%</span></div>}
+                  </div>}
+                  {isRetainer&&commitTerm!=="none" && <div className="pt-2 mt-1 space-y-1" style={{ borderTop:`1px solid ${B.border2}` }}>
+                    <div className="flex justify-between text-xs"><span style={{ color:B.textMuted }}>Monthly</span><span className="text-white">${finalMonthly.toLocaleString()}/mo</span></div>
+                    <div className="flex justify-between text-xs"><span style={{ color:B.textMuted }}>{commitTerm} ({paidMonths} paid{freeMonths>0?` + ${freeMonths} free`:""})</span><span className="text-white">${finalTermTotal?.toLocaleString()}</span></div>
+                    <div className="flex justify-between text-xs font-bold"><span className="text-white">Hours ({commitTerm})</span><span className="text-white">{termHrsDelivered.toLocaleString()} hrs</span></div>
+                  </div>}
+                  <div className="flex justify-between text-xs font-bold pt-2 mt-1 rounded px-2 py-1" style={{ borderTop:`1px solid ${B.border2}`, background:needsApproval?B.orange+"22":B.border2, color:needsApproval?B.orange:B.gold }}><span>Effective rate{isRetainer&&commitTerm!=="none"?` (${commitTerm})`:""}</span><span>${effectiveBlendedRate}/hr{needsApproval?" ⚠":""}</span></div>
                 </div>
 
                 <div className="rounded-xl p-4 mb-4" style={{ border:`1px solid ${needsApproval?B.orange+"88":B.gold+"88"}`, background:needsApproval?B.orange+"0F":B.gold+"0A" }}>
                   {needsApproval && <div className="text-xs font-bold mb-2" style={{ color:B.orange }}>⚠ Manager Approval Required</div>}
-                  <div className="text-xs uppercase tracking-widest mb-1" style={{ color:needsApproval?B.orange:B.gold, opacity:0.7 }}>
-                    {isProject?"Total Investment (Client-Facing)":"Monthly Investment (Client-Facing)"}
-                  </div>
-                  <div className="text-4xl font-black" style={{ color:needsApproval?B.orange:B.gold }}>
-                    ${finalMonthly.toLocaleString()}{isRetainer&&commitTerm!=="none"?<span className="text-lg">/mo</span>:""}
-                  </div>
-                  {isRetainer&&commitTerm!=="none" && (
-                    <div className="text-sm mt-1 font-semibold" style={{ color:B.gold }}>
-                      Pay {paidMonths}{freeMonths>0?`, get ${freeMonths} free`:""} · ${finalTermTotal?.toLocaleString()} total
-                    </div>
-                  )}
+                  <div className="text-xs uppercase tracking-widest mb-1" style={{ color:needsApproval?B.orange:B.gold, opacity:0.7 }}>{isProject?"Total Investment (Client-Facing)":"Monthly Investment (Client-Facing)"}</div>
+                  <div className="text-4xl font-black" style={{ color:needsApproval?B.orange:B.gold }}>${finalMonthly.toLocaleString()}{isRetainer&&commitTerm!=="none"?<span className="text-lg">/mo</span>:""}</div>
+                  {isRetainer&&commitTerm!=="none" && <div className="text-sm mt-1 font-semibold" style={{ color:B.gold }}>Pay {paidMonths}{freeMonths>0?`, get ${freeMonths} free`:""} · ${finalTermTotal?.toLocaleString()} total</div>}
                   <div className="text-xs mt-2 italic" style={{ color:B.textDim }}>Hours never shown to client</div>
                 </div>
-
-                <button onClick={reset} className="w-full py-2 rounded-lg text-xs transition-all"
-                  style={{ color:B.textDim, border:`1px solid ${B.border2}`, background:"transparent" }}>
-                  Reset Calculator
-                </button>
+                <button onClick={reset} className="w-full py-2 rounded-lg text-xs transition-all" style={{ color:B.textDim, border:`1px solid ${B.border2}`, background:"transparent" }}>Reset Calculator</button>
               </div>
             )}
           </div>
