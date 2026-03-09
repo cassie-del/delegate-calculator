@@ -1,25 +1,74 @@
-
 // File: api/analyze.js
 // Place this at the ROOT of your repo (not inside src/)
-// Vercel automatically treats files in /api as serverless functions
 
 export default async function handler(req, res) {
   if (req.method !== "POST") {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const apiKey = process.env.ANTHROPIC_API_KEY; // Server-side env var (no VITE_ prefix)
+  const apiKey = process.env.ANTHROPIC_API_KEY;
 
   if (!apiKey) {
     return res.status(500).json({ error: "ANTHROPIC_API_KEY not configured on server" });
   }
 
   try {
-    const { accountText } = req.body;
+    const { accountText, fileData, fileType, fileName } = req.body;
 
-    if (!accountText || !accountText.trim()) {
-      return res.status(400).json({ error: "accountText is required" });
+    if ((!accountText || !accountText.trim()) && !fileData) {
+      return res.status(400).json({ error: "accountText or fileData is required" });
     }
+
+    const systemPrompt = `You are a pricing analyst for Delegate, a Salesforce consulting firm. Analyze the provided account strategy and score all 6 pillars L/M/H, determine scope (defined/flexible/unknown) and time (ongoing/timebound/unknown), suggest ideation duration if applicable, recommend number of Builders if operational, and if execution suggest estimated hours per role and risk buffer (Low/Medium/High).
+
+Pillar definitions:
+- presence: Does the client need proactive outreach before they ask? L=self-sufficient, M=regular check-ins, H=exec visibility/high-touch
+- clarity: Can the client explain what we're doing and why? L=well-defined reqs, M=some ambiguity, H=high decision volume
+- predictability: Does the client trust we deliver? L=low-risk clear scope, M=some timeline risk, H=high complexity/unknowns
+- driveValue: Is the client's business getting better? L=tactical/self-evident, M=needs articulation, H=ROI docs needed
+- strategicGuidance: Does the client feel confident about what's next? L=clear direction, M=strategic questions, H=major decisions/vendor selection
+- championing: Can client leadership articulate our value? L=single decision-maker, M=some internal selling, H=CFO approval/business case needed
+
+Engagement matrix:
+- defined scope + timebound = execution
+- flexible scope + timebound = operational
+- defined scope + ongoing = strategic
+- flexible scope + ongoing = strategic
+- If scope or time is unclear from the document, use "unknown" which maps to ideation
+
+Respond ONLY with valid JSON, no markdown, no explanation:
+{"presence":"L|M|H","clarity":"L|M|H","predictability":"L|M|H","driveValue":"L|M|H","strategicGuidance":"L|M|H","championing":"L|M|H","scope":"defined|flexible|unknown","time":"ongoing|timebound|unknown","duration":4,"numBuilders":1,"exBuilderHrs":80,"exConnectorHrs":20,"exAmplifierHrs":0,"riskBuffer":"Low|Medium|High","summary":"2-3 sentence explanation of your scoring rationale"}`;
+
+    // Build the user message content blocks
+    const contentBlocks = [];
+
+    // Add file if provided (PDF or image)
+    if (fileData) {
+      if (fileType === "application/pdf") {
+        contentBlocks.push({
+          type: "document",
+          source: { type: "base64", media_type: "application/pdf", data: fileData },
+        });
+      } else if (fileType.startsWith("image/")) {
+        contentBlocks.push({
+          type: "image",
+          source: { type: "base64", media_type: fileType, data: fileData },
+        });
+      }
+    }
+
+    // Add text prompt
+    const textParts = [];
+    if (accountText && accountText.trim()) {
+      textParts.push("Account Strategy:\n" + accountText.trim());
+    }
+    if (fileData) {
+      textParts.push("I've also attached a document with account/strategy information. Please analyze all provided content together.");
+    }
+    if (textParts.length === 0) {
+      textParts.push("Please analyze the attached document.");
+    }
+    contentBlocks.push({ type: "text", text: textParts.join("\n\n") });
 
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -31,26 +80,8 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         model: "claude-sonnet-4-20250514",
         max_tokens: 1000,
-        messages: [
-          {
-            role: "user",
-            content: `You are a pricing analyst for Delegate, a Salesforce consulting firm. Analyze this account strategy and score all 6 pillars L/M/H, determine scope (defined/flexible) and time (ongoing/timebound), suggest ideation duration if applicable, recommend number of Builders if operational, and if execution suggest estimated hours per role and risk buffer (Low/Medium/High).
-
-Pillar definitions:
-- presence: Does the client need proactive outreach before they ask? L=self-sufficient, M=regular check-ins, H=exec visibility/high-touch
-- clarity: Can the client explain what we're doing and why? L=well-defined reqs, M=some ambiguity, H=high decision volume
-- predictability: Does the client trust we deliver? L=low-risk clear scope, M=some timeline risk, H=high complexity/unknowns
-- driveValue: Is the client's business getting better? L=tactical/self-evident, M=needs articulation, H=ROI docs needed
-- strategicGuidance: Does the client feel confident about what's next? L=clear direction, M=strategic questions, H=major decisions/vendor selection
-- championing: Can client leadership articulate our value? L=single decision-maker, M=some internal selling, H=CFO approval/business case needed
-
-Respond ONLY with valid JSON, no markdown, no explanation:
-{"presence":"L|M|H","clarity":"L|M|H","predictability":"L|M|H","driveValue":"L|M|H","strategicGuidance":"L|M|H","championing":"L|M|H","scope":"defined|flexible","time":"ongoing|timebound","duration":4,"numBuilders":1,"exBuilderHrs":80,"exConnectorHrs":20,"exAmplifierHrs":0,"riskBuffer":"Low|Medium|High","summary":"2-3 sentence explanation of your scoring rationale"}
-
-Account Strategy:
-${accountText}`,
-          },
-        ],
+        system: systemPrompt,
+        messages: [{ role: "user", content: contentBlocks }],
       }),
     });
 
