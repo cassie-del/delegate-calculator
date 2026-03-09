@@ -57,11 +57,10 @@ const ssClass = v => v ? "text-xs font-bold px-3 py-1 rounded-full border" : "";
 const ssStyle = v => v ? { background: SS[v].bg, color: SS[v].text, borderColor: SS[v].border } : {};
 const SL = { L: "Low", M: "Medium", H: "High" };
 
-// Pillar-driven hour calculations
-const PILLAR_EXTRA = { L: 0, M: 2, H: 5 }; // extra hrs per builder pillar per builder
-const CONNECTOR_HRS = { L: 8, M: 15, H: 30 }; // /mo based on higher of presence/clarity
-const AMPLIFIER_HRS = { L: 2, M: 5, H: 10 }; // /mo based on higher of stratGuidance/championing
-const BUILDER_BASE = 40; // per builder per month
+const PILLAR_EXTRA = { L: 0, M: 2, H: 5 };
+const CONNECTOR_HRS = { L: 8, M: 15, H: 30 };
+const AMPLIFIER_HRS = { L: 2, M: 5, H: 10 };
+const BUILDER_BASE = 40;
 
 const higherScore = (a, b) => {
   const order = { H: 3, M: 2, L: 1 };
@@ -72,16 +71,19 @@ const higherScore = (a, b) => {
 };
 
 const DelegateLogo = () => (
-  <svg width="32" height="32" viewBox="0 0 100 100" fill="none">
+  <svg width="32" height="32" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
     <polygon points="50,5 95,27.5 95,72.5 50,95 5,72.5 5,27.5" fill="none" stroke="#2A2A2A" strokeWidth="2"/>
     <polygon points="50,15 85,32.5 85,67.5 50,85 15,67.5 15,32.5" fill="none" stroke="#333" strokeWidth="1"/>
     <line x1="50" y1="5" x2="50" y2="95" stroke={B.teal} strokeWidth="3" opacity="0.6"/>
     <line x1="5" y1="27.5" x2="95" y2="72.5" stroke={B.gold} strokeWidth="3" opacity="0.6"/>
     <line x1="95" y1="27.5" x2="5" y2="72.5" stroke={B.orange} strokeWidth="3" opacity="0.6"/>
     <circle cx="50" cy="50" r="8" fill={B.gold} opacity="0.9"/>
-    <circle cx="50" cy="5" r="4" fill={B.teal}/><circle cx="95" cy="27.5" r="4" fill={B.lightBlue}/>
-    <circle cx="95" cy="72.5" r="4" fill={B.gold}/><circle cx="50" cy="95" r="4" fill={B.orange}/>
-    <circle cx="5" cy="72.5" r="4" fill={B.orange}/><circle cx="5" cy="27.5" r="4" fill={B.teal}/>
+    <circle cx="50" cy="5" r="4" fill={B.teal}/>
+    <circle cx="95" cy="27.5" r="4" fill={B.lightBlue}/>
+    <circle cx="95" cy="72.5" r="4" fill={B.gold}/>
+    <circle cx="50" cy="95" r="4" fill={B.orange}/>
+    <circle cx="5" cy="72.5" r="4" fill={B.orange}/>
+    <circle cx="5" cy="27.5" r="4" fill={B.teal}/>
   </svg>
 );
 
@@ -162,12 +164,19 @@ function Card({ children, className="" }) {
 }
 
 export default function App() {
+  // ALL HOOKS BEFORE ANY CONDITIONAL RETURN (React rules of hooks)
+  const [authed, setAuthed] = useState(false);
+  const [pw, setPw] = useState('');
+  const [pwErr, setPwErr] = useState(false);
+
   const [scores, setScores] = useState({});
   const [scope, setScope] = useState(null);
   const [time, setTime] = useState(null);
   const [duration, setDuration] = useState(4);
   const [numBuilders, setNumBuilders] = useState(1);
   const [accountText, setAccountText] = useState("");
+  const [analyzing, setAnalyzing] = useState(false);
+  const [aiSummary, setAiSummary] = useState("");
 
   const [manBuilderHrs, setManBuilderHrs] = useState(null);
   const [manConnectorHrs, setManConnectorHrs] = useState(null);
@@ -186,6 +195,40 @@ export default function App() {
   const [manualDiscount, setManualDiscount] = useState(0);
   const [showDiscounts, setShowDiscounts] = useState(false);
 
+  // Password gate
+  const handleLogin = () => {
+    if (pw === import.meta.env.VITE_APP_PASSWORD) {
+      setAuthed(true);
+    } else {
+      setPwErr(true);
+      setTimeout(() => setPwErr(false), 2000);
+    }
+  };
+
+  if (!authed) return (
+    <div className="min-h-screen bg-black flex items-center justify-center">
+      <div className="bg-gray-900 border border-gray-700 rounded-2xl p-10 w-full max-w-sm text-center">
+        <div className="flex items-center justify-center gap-2 mb-8">
+          <DelegateLogo />
+          <span className="text-lg font-black tracking-tight text-white">Delegate</span>
+        </div>
+        <h1 className="text-white font-bold text-lg mb-1">Pricing Calculator</h1>
+        <p className="text-gray-500 text-xs mb-6">Internal use only</p>
+        <input type="password" placeholder="Enter team password" value={pw}
+          onChange={e => setPw(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && handleLogin()}
+          className={`w-full bg-gray-800 border rounded-lg px-4 py-3 text-white text-sm text-center focus:outline-none mb-3 ${pwErr ? 'border-red-500' : 'border-gray-600 focus:border-yellow-500'}`}
+        />
+        {pwErr && <p className="text-red-400 text-xs mb-3">Incorrect password. Try again.</p>}
+        <button onClick={handleLogin} className="w-full py-3 rounded-lg font-semibold text-sm text-black transition-all"
+          style={{ backgroundColor: '#F59E0B' }}>
+          Enter
+        </button>
+      </div>
+    </div>
+  );
+
+  // Calculator logic
   const setScore = (id, val) => setScores(s => ({ ...s, [id]: val }));
   const allScored = PILLARS.every(p => scores[p.id]);
   const matrixCell = scope && time ? MATRIX.find(m => m.scope===scope && m.time===time) : null;
@@ -196,7 +239,6 @@ export default function App() {
 
   const avgMult = allScored ? PILLARS.reduce((s,p) => s+MULT[scores[p.id]],0)/PILLARS.length : null;
 
-  // Pillar-driven recommended hours
   const predScore = scores.predictability;
   const dvScore = scores.driveValue;
   const connScore = higherScore(scores.presence, scores.clarity);
@@ -208,23 +250,20 @@ export default function App() {
   const recConnectorHrs = connScore ? CONNECTOR_HRS[connScore] : 0;
   const recAmplifierHrs = ampScore ? AMPLIFIER_HRS[ampScore] : 0;
 
-  // Builder breakdown label
   const builderBreakdown = allScored
     ? `${numBuilders}×${BUILDER_BASE}h base + ${numBuilders}×${recBuilderExtra}h (Pred: ${predScore} +${PILLAR_EXTRA[predScore]}, DV: ${dvScore} +${PILLAR_EXTRA[dvScore]})`
     : "Score pillars to calculate";
   const connBreakdown = connScore
-    ? `Higher of Presence(${scores.presence})/Clarity(${scores.clarity}) → ${connScore} = ${CONNECTOR_HRS[connScore]}h/mo`
+    ? `Higher of Pres(${scores.presence})/Clar(${scores.clarity}) → ${connScore} = ${CONNECTOR_HRS[connScore]}h/mo`
     : "Score pillars to calculate";
   const ampBreakdown = ampScore
     ? `Higher of Strat(${scores.strategicGuidance})/Champ(${scores.championing}) → ${ampScore} = ${AMPLIFIER_HRS[ampScore]}h/mo`
     : "Score pillars to calculate";
 
-  // Determine builder rate based on engagement type
   let builderRate = RATES.builderSt;
   if (isOp) builderRate = RATES.builderOp;
   else if (isExecution) builderRate = RATES.builderEx;
 
-  // Use manual overrides or recommended
   let builderHrs, connectorHrs, amplifierHrs;
   if (isExecution) {
     builderHrs=exBuilderHrs; connectorHrs=exConnectorHrs; amplifierHrs=showAmplifier?exAmplifierHrs:0;
@@ -264,7 +303,6 @@ export default function App() {
   const discountEquivPct = blendedRate>0 ? 1-(effectiveBlendedRate/blendedRate) : 0;
   const needsApproval = (pctDiscTotal>MAX_AUTO_DISCOUNT)||(freeMonths>0&&discountEquivPct>MAX_AUTO_DISCOUNT);
 
-  // Tier label (cosmetic)
   const needsConnector = ["presence","clarity"].some(p => scores[p]==="M"||scores[p]==="H");
   const amplifierDepth = ["strategicGuidance","championing"].filter(p => scores[p]==="H").length;
   const recTier = isOp ? (needsConnector?(numBuilders>1?OP_TIERS[2]:OP_TIERS[1]):OP_TIERS[0])
@@ -277,9 +315,45 @@ export default function App() {
   if (pctDiscTotal > 0) discountParts.push(`−${(pctDiscTotal*100).toFixed(0)}%`);
   const discountBadgeText = discountParts.join(" + ");
 
+  // AI scoring via serverless function
+  const analyzeWithAI = async () => {
+    if (!accountText.trim()) return;
+    setAnalyzing(true);
+    setAiSummary("");
+    try {
+      const res = await fetch("/api/analyze", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ accountText: accountText.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "API request failed");
+      const text = data.content?.find(b => b.type === "text")?.text || "";
+      const p = JSON.parse(text.replace(/```json|```/g, "").trim());
+      setScores({
+        presence: p.presence, clarity: p.clarity, predictability: p.predictability,
+        driveValue: p.driveValue, strategicGuidance: p.strategicGuidance, championing: p.championing,
+      });
+      if (p.scope) setScope(p.scope);
+      if (p.time) setTime(p.time);
+      if (p.duration) setDuration(p.duration);
+      if (p.numBuilders) setNumBuilders(p.numBuilders);
+      if (p.exBuilderHrs) setExBuilderHrs(p.exBuilderHrs);
+      if (p.exConnectorHrs) setExConnectorHrs(p.exConnectorHrs);
+      if (p.exAmplifierHrs && p.exAmplifierHrs > 0) { setExAmplifierHrs(p.exAmplifierHrs); setShowAmplifier(true); }
+      if (p.riskBuffer) setRiskBuffer(p.riskBuffer);
+      if (p.summary) setAiSummary(p.summary);
+      // Reset manual overrides so pillar-driven hours take effect
+      setManBuilderHrs(null); setManConnectorHrs(null); setManAmplifierHrs(null);
+    } catch(e) {
+      setAiSummary("Could not analyze — " + (e.message || "try again or complete fields manually."));
+    }
+    setAnalyzing(false);
+  };
+
   const reset = () => {
     setScores({}); setScope(null); setTime(null); setDuration(4); setNumBuilders(1);
-    setAccountText(""); setExBuilderHrs(80); setExConnectorHrs(20);
+    setAccountText(""); setAiSummary(""); setExBuilderHrs(80); setExConnectorHrs(20);
     setExAmplifierHrs(0); setShowAmplifier(false); setRiskBuffer("Medium");
     setCommitTerm("none"); setNewClient(false); setNewClientPct(5);
     setFreeMonths(0); setManualDiscount(0); setShowDiscounts(false);
@@ -315,7 +389,7 @@ export default function App() {
 
       <div className="max-w-5xl mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div>
-          {/* STEP 1: Account Strategy */}
+          {/* STEP 1 */}
           <Card>
             <div className="flex items-center gap-2 mb-3">
               <StepBadge n="1" />
@@ -324,15 +398,26 @@ export default function App() {
             </div>
             <textarea className="w-full rounded-lg p-3 text-sm resize-none focus:outline-none"
               style={{ background: B.surface2, border: `1px solid ${B.border2}`, color: "#CCC", caretColor: B.gold }}
-              rows={4} placeholder="Paste account strategy or pre-sales notes..."
+              rows={4} placeholder="Paste account strategy or pre-sales notes. AI will auto-score all pillars and complete the engagement diagnostic..."
               value={accountText} onChange={e => setAccountText(e.target.value)} />
-            <button disabled className="mt-2 w-full py-2 rounded-lg font-semibold text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-              style={{ background: B.surface2, color: B.textDim, border: `1px solid ${B.border2}` }}>
-              ⚡ Auto-Score with AI (preview only)
+            <button onClick={analyzeWithAI} disabled={!accountText.trim() || analyzing}
+              className="mt-2 w-full py-2 rounded-lg font-semibold text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+              style={{
+                background: accountText.trim() && !analyzing ? `linear-gradient(135deg, ${B.gold}, ${B.orange})` : B.surface2,
+                color: accountText.trim() && !analyzing ? "#000" : B.textDim,
+                border: `1px solid ${B.border2}`
+              }}>
+              {analyzing ? "Analyzing..." : "⚡ Auto-Score with AI"}
             </button>
+            {aiSummary && (
+              <div className="mt-3 p-3 rounded-lg text-xs"
+                style={{ background: B.teal+"18", border: `1px solid ${B.teal}44`, color: B.lightBlue }}>
+                <span className="font-semibold" style={{ color: "#7DD3FC" }}>AI Analysis: </span>{aiSummary}
+              </div>
+            )}
           </Card>
 
-          {/* STEP 2: Devon Values */}
+          {/* STEP 2 */}
           <Card>
             <div className="flex items-center gap-2 mb-1">
               <StepBadge n="2" />
@@ -389,7 +474,7 @@ export default function App() {
             )}
           </Card>
 
-          {/* STEP 3: Score Pillars */}
+          {/* STEP 3 */}
           <Card>
             <div className="flex items-center gap-2 mb-4">
               <StepBadge n="3" />
@@ -398,7 +483,7 @@ export default function App() {
             {PILLARS.map(p => <PillarCard key={p.id} pillar={p} value={scores[p.id]} onChange={setScore}/>)}
           </Card>
 
-          {/* STEP 4: Hours / Month — NOW AFTER PILLARS */}
+          {/* STEP 4: Hours (non-execution) */}
           {!isExecution && allScored && scope && time && (
             <Card>
               <div className="flex items-center justify-between mb-4">
@@ -414,15 +499,12 @@ export default function App() {
                 )}
               </div>
               <p className="text-xs mb-4 ml-8" style={{ color: B.textDim }}>Hours are calculated from your pillar scores. Override any value below.</p>
-
-              {/* Number of Builders */}
               <div className="mb-4">
                 <div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: B.textMuted }}>Number of Builders</div>
                 <div className="flex gap-2">{[1,2,3,4].map(n => (
                   <button key={n} onClick={() => { setNumBuilders(n); setManBuilderHrs(null); }} className="flex-1 py-2 rounded-lg text-sm font-bold transition-all" style={selBtn(numBuilders===n, B.gold)}>{n}</button>
                 ))}</div>
               </div>
-
               <HrsTypeInput label="Builder" value={builderHrs} recommended={recBuilderHrs}
                 onChange={v => setManBuilderHrs(v)} rate={builderRate} color={ROLE_COLORS.Builder}
                 breakdownLabel={builderBreakdown} />
@@ -432,7 +514,6 @@ export default function App() {
               <HrsTypeInput label="Amplifier" value={amplifierHrs} recommended={recAmplifierHrs}
                 onChange={v => setManAmplifierHrs(v)} rate={RATES.amplifier} color={ROLE_COLORS.Amplifier}
                 breakdownLabel={ampBreakdown} />
-
               <div className="mt-3 flex items-center justify-between rounded-lg px-3 py-2" style={{ background: B.border2 }}>
                 <div className="text-xs font-semibold text-white">Total Hours</div>
                 <div className="text-xs font-black text-white">{totalHrs} hrs/{isIdeation?"sprint":"mo"}</div>
@@ -440,7 +521,7 @@ export default function App() {
             </Card>
           )}
 
-          {/* Execution hours (unchanged — no pillar-driven logic) */}
+          {/* STEP 4: Hours (execution) */}
           {isExecution && allScored && scope && time && (
             <Card>
               <div className="flex items-center gap-2 mb-4">
@@ -466,7 +547,7 @@ export default function App() {
             </Card>
           )}
 
-          {/* STEP 5: Discounts */}
+          {/* STEP 5 */}
           <div className="rounded-xl p-5" style={{ background: B.surface, border: `1px solid ${B.border2}` }}>
             <button onClick={() => setShowDiscounts(!showDiscounts)} className="w-full flex items-center justify-between">
               <div className="flex items-center gap-2 flex-wrap">
@@ -566,7 +647,7 @@ export default function App() {
           </div>
         </div>
 
-        {/* RIGHT COLUMN — Output */}
+        {/* RIGHT COLUMN */}
         <div className="lg:sticky lg:top-4 lg:self-start">
           <div className="rounded-xl p-5" style={{ background: B.surface, border: `1px solid ${B.border2}` }}>
             <h2 className="font-semibold text-white mb-4 flex items-center gap-2">
@@ -601,8 +682,6 @@ export default function App() {
                     <div className="text-sm" style={{ color:"#CCC" }}>{recTier?.desc||""}</div>
                   </div>
                 )}
-
-                {/* Pillar scores */}
                 <div className="mb-4">
                   <div className="text-xs uppercase tracking-widest mb-2" style={{ color: B.textDim }}>Pillar Score Summary</div>
                   <div className="grid grid-cols-2 gap-2">
@@ -619,7 +698,6 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Side-by-side comparison */}
                 {anyDiff && !isExecution && (
                   <div className="mb-4 rounded-xl overflow-hidden" style={{ border: `1px solid ${B.gold}44` }}>
                     <div className="px-3 py-2 text-xs font-semibold uppercase tracking-widest" style={{ background: B.gold+"18", color: B.gold }}>
@@ -679,7 +757,6 @@ export default function App() {
                   </div>
                 )}
 
-                {/* Resourcing */}
                 <div className="mb-4">
                   <div className="text-xs uppercase tracking-widest mb-2" style={{ color: B.textDim }}>Internal Resourcing</div>
                   <div className="space-y-2">
@@ -709,7 +786,6 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Price build-up */}
                 <div className="mb-4 rounded-lg p-3 space-y-1" style={{ background:B.surface2 }}>
                   <div className="text-xs uppercase tracking-widest mb-2" style={{ color:B.textDim }}>Price Build-Up</div>
                   <div className="flex justify-between text-xs"><span style={{ color:B.textMuted }}>Base (hours × rates)</span><span className="text-white">${baseInv.toLocaleString()}</span></div>
@@ -738,7 +814,6 @@ export default function App() {
                   </div>
                 </div>
 
-                {/* Final price */}
                 <div className="rounded-xl p-4 mb-4" style={{ border:`1px solid ${needsApproval?B.orange+"88":B.gold+"88"}`, background:needsApproval?B.orange+"0F":B.gold+"0A" }}>
                   {needsApproval && <div className="text-xs font-bold mb-2" style={{ color:B.orange }}>⚠ Manager Approval Required</div>}
                   <div className="text-xs uppercase tracking-widest mb-1" style={{ color:needsApproval?B.orange:B.gold, opacity:0.7 }}>
