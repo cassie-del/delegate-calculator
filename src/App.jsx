@@ -263,35 +263,72 @@ export default function App() {
 
   const needsConnector = ["presence","clarity"].some(p => scores[p]==="M"||scores[p]==="H");
   const amplifierDepth = ["strategicGuidance","championing"].filter(p => scores[p]==="H").length;
+  // Recommendation: use original calculator logic. Operational tier depends on Connector need
+  // and number of builders. Strategic tier depends on how many amplifier-related pillars are High.
   const recTier = isOp?(needsConnector?(numBuilders>1?OP_TIERS[2]:OP_TIERS[1]):OP_TIERS[0]):isSt?(amplifierDepth>=2?ST_TIERS[2]:amplifierDepth===1?ST_TIERS[1]:ST_TIERS[0]):null;
   const clientTierLabel = recTier?.label||(isIdeation?"Ideation":isExecution?"Execution Project":null);
   const clientTierColor = recTier?.color||(isIdeation?"#7C5CBF":isExecution?"#2A9D6A":B.textDim);
 
-  // Tier scenario math — computes hours + price for each tier at its CANONICAL config.
-  // Operational tiers: role mix is fixed per tier; hours derive from actual pillar scores.
-  // Strategic tiers: each tier maps to a pillar-intensity profile (Drive=Low, Amplify=Med, Excel=High).
-  // In both cases the actual pillar multiplier is applied so the comparison reflects this client.
+  // Tier scenario math.
+  // RECOMMENDED tier: mirrors main pricing flow exactly (actual hours, actual final price) so the
+  // number on the recommended card always equals the client-facing investment in the right column.
+  // NON-RECOMMENDED tiers: show canonical reference pricing for that tier level, with discounts applied.
   const computeTierScenario = (tierId, engagement) => {
-    if (engagement === "operational") {
-      const builders = tierId === "excel" ? 2 : 1;
-      const includeConn = tierId !== "execute";
-      const bHrs = (BUILDER_BASE * builders) + ((PILLAR_EXTRA[predScore]||0) + (PILLAR_EXTRA[dvScore]||0)) * builders;
-      const cHrs = includeConn && connScore ? CONNECTOR_HRS[connScore] : 0;
-      const aHrs = 0;
-      const base = (bHrs * RATES.builderOp) + (cHrs * RATES.connector) + (aHrs * RATES.amplifier);
-      const total = avgMult ? base * avgMult : base;
-      return { builders, includeConn, includeAmp: false, bHrs, cHrs, aHrs, base, total, totalRounded: Math.round(total/100)*100, totalHrs: bHrs+cHrs+aHrs };
+    const isRecommended = recTier?.id === tierId;
+    let bHrs, cHrs, aHrs, bldrs;
+    const perBuilderHrs = BUILDER_BASE + (PILLAR_EXTRA[predScore]||0) + (PILLAR_EXTRA[dvScore]||0);
+
+    if (isRecommended) {
+      // Actual scored engagement — matches main output by construction
+      bldrs = numBuilders; bHrs = builderHrs; cHrs = connectorHrs; aHrs = amplifierHrs;
+    } else if (engagement === "strategic") {
+      bldrs = 1;
+      if (tierId === "drive") {
+        bHrs = BUILDER_BASE; cHrs = CONNECTOR_HRS.L; aHrs = AMPLIFIER_HRS.L;
+      } else if (tierId === "amplify") {
+        bHrs = BUILDER_BASE + (PILLAR_EXTRA.M * 2); cHrs = CONNECTOR_HRS.M; aHrs = AMPLIFIER_HRS.M;
+      } else {
+        bHrs = BUILDER_BASE + (PILLAR_EXTRA.H * 2); cHrs = CONNECTOR_HRS.H; aHrs = AMPLIFIER_HRS.H;
+      }
+    } else if (engagement === "operational") {
+      if (tierId === "execute") {
+        bldrs = 1; bHrs = perBuilderHrs; cHrs = 0; aHrs = 0;
+      } else if (tierId === "elevate") {
+        bldrs = 1; bHrs = perBuilderHrs; cHrs = connScore ? CONNECTOR_HRS[connScore] : 0; aHrs = 0;
+      } else {
+        bldrs = 2; bHrs = 2 * perBuilderHrs; cHrs = connScore ? CONNECTOR_HRS[connScore] : 0; aHrs = 0;
+      }
+    } else {
+      return null;
     }
-    if (engagement === "strategic") {
-      const profile = tierId === "drive" ? "L" : tierId === "amplify" ? "M" : "H";
-      const bHrs = BUILDER_BASE + (PILLAR_EXTRA[profile] * 2);
-      const cHrs = CONNECTOR_HRS[profile];
-      const aHrs = AMPLIFIER_HRS[profile];
-      const base = (bHrs * RATES.builderSt) + (cHrs * RATES.connector) + (aHrs * RATES.amplifier);
-      const total = avgMult ? base * avgMult : base;
-      return { builders: 1, includeConn: true, includeAmp: true, bHrs, cHrs, aHrs, base, total, totalRounded: Math.round(total/100)*100, totalHrs: bHrs+cHrs+aHrs };
+
+    // Recommended tier reuses the main pricing output's final number (guaranteed match)
+    if (isRecommended) {
+      return {
+        builders: bldrs, bHrs, cHrs, aHrs,
+        totalHrs: bHrs + cHrs + aHrs,
+        includeConn: cHrs > 0, includeAmp: aHrs > 0,
+        finalRounded: finalMonthly,
+        discountPct: pctDiscTotal,
+      };
     }
-    return null;
+
+    // Non-recommended tier: run pricing build-up fresh with discounts applied
+    const tBuilderRate = engagement === "operational" ? RATES.builderOp : RATES.builderSt;
+    const tBase = (bHrs * tBuilderRate) + (cHrs * RATES.connector) + (aHrs * RATES.amplifier);
+    const tAfterMult = avgMult ? tBase * avgMult : tBase;
+    const tTotalHrs = bHrs + cHrs + aHrs;
+    const tVolDisc = VOLUME_DISCOUNTS.find(v => tTotalHrs >= v.min && tTotalHrs <= v.max)?.pct || 0;
+    const tDiscTotal = commitDiscPct + newClientDisc + tVolDisc + manualDisc;
+    const tAfterDisc = tAfterMult * (1 - tDiscTotal);
+
+    return {
+      builders: bldrs, bHrs, cHrs, aHrs,
+      totalHrs: tTotalHrs,
+      includeConn: cHrs > 0, includeAmp: aHrs > 0,
+      finalRounded: Math.round(tAfterDisc / 100) * 100,
+      discountPct: tDiscTotal,
+    };
   };
 
   const discountParts = [];
@@ -638,7 +675,7 @@ export default function App() {
               <h2 className="font-semibold text-white">Compare {isOp?"Operational":"Strategic"} Tiers</h2>
             </div>
             <p className="text-xs mb-5" style={{ color:B.textDim }}>
-              Recommended tier highlighted in gold. Trade up or down depending on Devon's priorities, complexity, and budget. Pricing reflects this engagement's pillar multiplier ({avgMult?.toFixed(2)}x).
+              Recommended tier highlighted in gold (matches your engagement above). Other tiers show reference pricing for trading down or up. All prices include the pillar multiplier ({avgMult?.toFixed(2)}x) and any active discounts.
             </p>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {(isOp ? OP_TIERS : ST_TIERS).map(tier => {
@@ -668,11 +705,16 @@ export default function App() {
                         {tier.desc}
                       </div>
                       <div className="text-3xl font-black" style={{ color: isRec ? B.gold : "#FFF" }}>
-                        ${data.totalRounded.toLocaleString()}
+                        ${data.finalRounded.toLocaleString()}
                       </div>
-                      <div className="text-xs mb-3" style={{ color:B.textDim }}>
+                      <div className="text-xs mb-1" style={{ color:B.textDim }}>
                         per month · {data.totalHrs} hrs total
                       </div>
+                      {data.discountPct > 0 && (
+                        <div className="text-xs mb-2 font-semibold" style={{ color: "#4ADE80" }}>
+                          −{(data.discountPct*100).toFixed(0)}% discount applied
+                        </div>
+                      )}
                       <div className="pt-3 space-y-1.5 mt-auto" style={{ borderTop:`1px solid ${B.border}` }}>
                         <div className="flex items-center justify-between text-xs" style={{ opacity: data.bHrs > 0 ? 1 : 0.3 }}>
                           <div className="flex items-center gap-1.5">
