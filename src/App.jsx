@@ -267,6 +267,33 @@ export default function App() {
   const clientTierLabel = recTier?.label||(isIdeation?"Ideation":isExecution?"Execution Project":null);
   const clientTierColor = recTier?.color||(isIdeation?"#7C5CBF":isExecution?"#2A9D6A":B.textDim);
 
+  // Tier scenario math — computes hours + price for each tier at its CANONICAL config.
+  // Operational tiers: role mix is fixed per tier; hours derive from actual pillar scores.
+  // Strategic tiers: each tier maps to a pillar-intensity profile (Drive=Low, Amplify=Med, Excel=High).
+  // In both cases the actual pillar multiplier is applied so the comparison reflects this client.
+  const computeTierScenario = (tierId, engagement) => {
+    if (engagement === "operational") {
+      const builders = tierId === "excel" ? 2 : 1;
+      const includeConn = tierId !== "execute";
+      const bHrs = (BUILDER_BASE * builders) + ((PILLAR_EXTRA[predScore]||0) + (PILLAR_EXTRA[dvScore]||0)) * builders;
+      const cHrs = includeConn && connScore ? CONNECTOR_HRS[connScore] : 0;
+      const aHrs = 0;
+      const base = (bHrs * RATES.builderOp) + (cHrs * RATES.connector) + (aHrs * RATES.amplifier);
+      const total = avgMult ? base * avgMult : base;
+      return { builders, includeConn, includeAmp: false, bHrs, cHrs, aHrs, base, total, totalRounded: Math.round(total/100)*100, totalHrs: bHrs+cHrs+aHrs };
+    }
+    if (engagement === "strategic") {
+      const profile = tierId === "drive" ? "L" : tierId === "amplify" ? "M" : "H";
+      const bHrs = BUILDER_BASE + (PILLAR_EXTRA[profile] * 2);
+      const cHrs = CONNECTOR_HRS[profile];
+      const aHrs = AMPLIFIER_HRS[profile];
+      const base = (bHrs * RATES.builderSt) + (cHrs * RATES.connector) + (aHrs * RATES.amplifier);
+      const total = avgMult ? base * avgMult : base;
+      return { builders: 1, includeConn: true, includeAmp: true, bHrs, cHrs, aHrs, base, total, totalRounded: Math.round(total/100)*100, totalHrs: bHrs+cHrs+aHrs };
+    }
+    return null;
+  };
+
   const discountParts = [];
   if (freeMonths>0) discountParts.push(`${freeMonths} free mo`);
   if (pctDiscTotal>0) discountParts.push(`−${(pctDiscTotal*100).toFixed(0)}%`);
@@ -601,6 +628,91 @@ export default function App() {
           </div>
         </div>
       </div>
+
+      {/* TIER COMPARISON — side-by-side view of all three engagement tiers */}
+      {isRetainer && allScored && hasEngagement && (
+        <div className="max-w-5xl mx-auto px-4 pb-8">
+          <div className="rounded-xl p-5" style={{ background:B.surface, border:`1px solid ${B.border2}` }}>
+            <div className="flex items-center gap-2 mb-1">
+              <span style={{ color:B.gold, fontSize:"18px" }}>◆</span>
+              <h2 className="font-semibold text-white">Compare {isOp?"Operational":"Strategic"} Tiers</h2>
+            </div>
+            <p className="text-xs mb-5" style={{ color:B.textDim }}>
+              Recommended tier highlighted in gold. Trade up or down depending on Devon's priorities, complexity, and budget. Pricing reflects this engagement's pillar multiplier ({avgMult?.toFixed(2)}x).
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {(isOp ? OP_TIERS : ST_TIERS).map(tier => {
+                const data = computeTierScenario(tier.id, engType);
+                if (!data) return null;
+                const isRec = recTier?.id === tier.id;
+                return (
+                  <div key={tier.id} className="rounded-xl overflow-hidden relative flex flex-col"
+                    style={{
+                      border: `2px solid ${isRec ? B.gold : B.border2}`,
+                      background: isRec ? B.gold+"08" : B.surface2,
+                      boxShadow: isRec ? `0 8px 24px -8px ${B.gold}55` : "none",
+                      transform: isRec ? "translateY(-2px)" : "none",
+                      transition: "all 0.2s",
+                    }}>
+                    {isRec && (
+                      <div className="py-1.5 text-center text-xs font-bold tracking-widest"
+                        style={{ background:B.gold, color:"#000" }}>
+                        RECOMMENDED FIT
+                      </div>
+                    )}
+                    <div className="p-4 flex-1 flex flex-col">
+                      <div className="text-xl font-black tracking-tight mb-1" style={{ color: tier.color }}>
+                        {tier.label}
+                      </div>
+                      <div className="text-xs mb-4 leading-relaxed" style={{ color:B.textMuted, minHeight:"32px" }}>
+                        {tier.desc}
+                      </div>
+                      <div className="text-3xl font-black" style={{ color: isRec ? B.gold : "#FFF" }}>
+                        ${data.totalRounded.toLocaleString()}
+                      </div>
+                      <div className="text-xs mb-3" style={{ color:B.textDim }}>
+                        per month · {data.totalHrs} hrs total
+                      </div>
+                      <div className="pt-3 space-y-1.5 mt-auto" style={{ borderTop:`1px solid ${B.border}` }}>
+                        <div className="flex items-center justify-between text-xs" style={{ opacity: data.bHrs > 0 ? 1 : 0.3 }}>
+                          <div className="flex items-center gap-1.5">
+                            <div className="w-1.5 h-1.5 rounded-full" style={{ background:ROLE_COLORS.Builder }}></div>
+                            <span style={{ color:"#CCC" }}>
+                              Builder{data.builders > 1 ? ` ×${data.builders}` : ""}
+                            </span>
+                          </div>
+                          <span className="font-bold text-white">{data.bHrs}h</span>
+                        </div>
+                        <div className="flex items-center justify-between text-xs" style={{ opacity: data.includeConn ? 1 : 0.3 }}>
+                          <div className="flex items-center gap-1.5">
+                            <div className="w-1.5 h-1.5 rounded-full" style={{ background:ROLE_COLORS.Connector }}></div>
+                            <span style={{ color:"#CCC" }}>Connector</span>
+                          </div>
+                          <span className="font-bold text-white">{data.includeConn ? `${data.cHrs}h` : "—"}</span>
+                        </div>
+                        <div className="flex items-center justify-between text-xs" style={{ opacity: data.includeAmp ? 1 : 0.3 }}>
+                          <div className="flex items-center gap-1.5">
+                            <div className="w-1.5 h-1.5 rounded-full" style={{ background:ROLE_COLORS.Amplifier }}></div>
+                            <span style={{ color:"#CCC" }}>Amplifier</span>
+                          </div>
+                          <span className="font-bold text-white">{data.includeAmp ? `${data.aHrs}h` : "—"}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+            <div className="mt-4 p-3 rounded-lg text-xs italic" style={{ background:B.surface2, color:B.textDim, border:`1px solid ${B.border}` }}>
+              {isOp ? (
+                <>Operational tiers differ by role mix — Execute is Builder-only, Elevate adds proactive delivery presence with a Connector, Excel scales to multiple Builders for max throughput.</>
+              ) : (
+                <>Strategic tiers map to engagement intensity — Drive at baseline depth, Amplify with deeper presence and guidance, Excel at maximum partnership across all three roles.</>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
