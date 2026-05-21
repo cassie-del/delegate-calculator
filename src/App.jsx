@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import React from "react";
 
 const B = {
@@ -156,9 +156,13 @@ function Card({ children, className="" }) {
 }
 
 export default function App() {
-  const [authed, setAuthed] = useState(false);
-  const [pw, setPw] = useState('');
-  const [pwErr, setPwErr] = useState(false);
+  // Salesforce auth state
+  const [me, setMe] = useState(null);          // { authenticated, displayName, email, ... } or null
+  const [meLoading, setMeLoading] = useState(true);
+  const [oppData, setOppData] = useState(null); // { id, name, accountName, stage, amount, ... } or null
+  const [oppLoading, setOppLoading] = useState(false);
+  const [oppError, setOppError] = useState(null);
+
   const [scores, setScores] = useState({});
   const [scope, setScope] = useState(null);
   const [time, setTime] = useState(null);
@@ -185,22 +189,74 @@ export default function App() {
   const [showDiscounts, setShowDiscounts] = useState(false);
   const fileInputRef = useRef(null);
 
-  // Login
-  const handleLogin = () => {
-    if (pw === import.meta.env.VITE_APP_PASSWORD) { setAuthed(true); }
-    else { setPwErr(true); setTimeout(() => setPwErr(false), 2000); }
+  // On mount: check whether the user is already signed in via SF
+  useEffect(() => {
+    fetch("/api/me", { credentials: "include" })
+      .then(r => r.json())
+      .then(data => { setMe(data); setMeLoading(false); })
+      .catch(() => { setMe({ authenticated: false }); setMeLoading(false); });
+  }, []);
+
+  // Once authed, if the URL has ?opportunityId=..., fetch the Opp and pre-fill context
+  useEffect(() => {
+    if (!me?.authenticated) return;
+    const params = new URLSearchParams(window.location.search);
+    const oppId = params.get("opportunityId") || params.get("oppId");
+    if (!oppId) return;
+    setOppLoading(true);
+    fetch(`/api/sf/opportunity?id=${encodeURIComponent(oppId)}`, { credentials: "include" })
+      .then(async r => {
+        if (!r.ok) {
+          const err = await r.json().catch(() => ({ error: r.statusText }));
+          throw new Error(err.error || "Failed to fetch Opportunity");
+        }
+        return r.json();
+      })
+      .then(opp => {
+        setOppData(opp);
+        // Pre-populate the Account Strategy field with Opp context
+        // (only if user hasn't typed anything yet)
+        setAccountText(prev => {
+          if (prev && prev.trim().length > 0) return prev;
+          const lines = [
+            opp.accountName ? `Account: ${opp.accountName}` : null,
+            opp.name ? `Opportunity: ${opp.name}` : null,
+            opp.stage ? `Stage: ${opp.stage}` : null,
+            opp.amount != null ? `Amount: $${Number(opp.amount).toLocaleString()}` : null,
+            opp.closeDate ? `Close Date: ${opp.closeDate}` : null,
+            opp.ownerName ? `Owner: ${opp.ownerName}` : null,
+            opp.description ? `\nDescription:\n${opp.description}` : null,
+          ].filter(Boolean);
+          return lines.join("\n");
+        });
+      })
+      .catch(e => setOppError(e.message))
+      .finally(() => setOppLoading(false));
+  }, [me?.authenticated]);
+
+  // Build the OAuth login URL, preserving the current opportunityId in returnTo
+  const buildLoginUrl = () => {
+    const returnTo = window.location.pathname + window.location.search;
+    return `/api/oauth/login?returnTo=${encodeURIComponent(returnTo)}`;
   };
 
-  if (!authed) return (
+  // Loading state while checking auth
+  if (meLoading) return (
+    <div className="min-h-screen bg-black flex items-center justify-center">
+      <div className="text-gray-500 text-sm">Loading…</div>
+    </div>
+  );
+
+  // Not authenticated → show Sign in with Salesforce
+  if (!me?.authenticated) return (
     <div className="min-h-screen bg-black flex items-center justify-center">
       <div className="bg-gray-900 border border-gray-700 rounded-2xl p-10 w-full max-w-sm text-center">
         <div className="flex items-center justify-center gap-2 mb-8"><DelegateLogo /><span className="text-lg font-black tracking-tight text-white">Delegate</span></div>
         <h1 className="text-white font-bold text-lg mb-1">Pricing Calculator</h1>
-        <p className="text-gray-500 text-xs mb-6">Internal use only</p>
-        <input type="password" placeholder="Enter team password" value={pw} onChange={e => setPw(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleLogin()}
-          className={`w-full bg-gray-800 border rounded-lg px-4 py-3 text-white text-sm text-center focus:outline-none mb-3 ${pwErr ? 'border-red-500' : 'border-gray-600 focus:border-yellow-500'}`} />
-        {pwErr && <p className="text-red-400 text-xs mb-3">Incorrect password. Try again.</p>}
-        <button onClick={handleLogin} className="w-full py-3 rounded-lg font-semibold text-sm text-black transition-all" style={{ backgroundColor: '#F59E0B' }}>Enter</button>
+        <p className="text-gray-500 text-xs mb-6">Sign in with your Salesforce account to continue</p>
+        <a href={buildLoginUrl()} className="w-full inline-block py-3 rounded-lg font-semibold text-sm text-black transition-all" style={{ backgroundColor: '#F59E0B' }}>
+          Sign in with Salesforce
+        </a>
       </div>
     </div>
   );
@@ -409,11 +465,41 @@ export default function App() {
       <div style={{ borderBottom:`1px solid ${B.border2}`, background:B.surface }} className="px-6 py-4">
         <div className="max-w-5xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3"><DelegateLogo /><div><div className="text-lg font-black tracking-tight text-white">Delegate</div><div className="text-xs" style={{ color:B.textDim }}>Pricing & Resourcing Calculator</div></div></div>
-          <div className="text-right"><div className="text-xs mb-1" style={{ color:B.textDim }}>Role Rates</div>
-            <div className="flex gap-3 text-xs"><div><span className="font-bold" style={{ color:B.gold }}>Builder</span><span style={{ color:B.textMuted }}> $225–$240</span></div><div><span className="font-bold" style={{ color:B.lightBlue }}>Connector</span><span style={{ color:B.textMuted }}> $265</span></div><div><span className="font-bold" style={{ color:B.orange }}>Amplifier</span><span style={{ color:B.textMuted }}> $325</span></div></div>
+          <div className="flex items-center gap-5">
+            <div className="text-right hidden md:block"><div className="text-xs mb-1" style={{ color:B.textDim }}>Role Rates</div>
+              <div className="flex gap-3 text-xs"><div><span className="font-bold" style={{ color:B.gold }}>Builder</span><span style={{ color:B.textMuted }}> $225–$240</span></div><div><span className="font-bold" style={{ color:B.lightBlue }}>Connector</span><span style={{ color:B.textMuted }}> $265</span></div><div><span className="font-bold" style={{ color:B.orange }}>Amplifier</span><span style={{ color:B.textMuted }}> $325</span></div></div>
+            </div>
+            <div className="flex items-center gap-2 pl-4" style={{ borderLeft:`1px solid ${B.border2}` }}>
+              <div className="text-right">
+                <div className="text-xs" style={{ color:B.textDim }}>Signed in</div>
+                <div className="text-xs font-semibold text-white">{me.displayName}</div>
+              </div>
+              <a href="/api/oauth/logout" className="text-xs px-2 py-1 rounded" style={{ color:B.textDim, border:`1px solid ${B.border2}` }} title="Sign out">↗</a>
+            </div>
           </div>
         </div>
       </div>
+
+      {/* Opportunity context banner — shows when launched from a Salesforce Opp */}
+      {(oppLoading || oppData || oppError) && (
+        <div style={{ background:B.surface2, borderBottom:`1px solid ${B.border}` }} className="px-6 py-2.5">
+          <div className="max-w-5xl mx-auto flex items-center gap-3 text-xs">
+            {oppLoading && <span style={{ color:B.textDim }}>Loading Opportunity from Salesforce…</span>}
+            {oppError && <span style={{ color:"#FCA5A5" }}>⚠ {oppError}</span>}
+            {oppData && (
+              <>
+                <span className="font-bold" style={{ color:B.gold }}>◆ Working from Salesforce Opportunity</span>
+                <span style={{ color:B.textDim }}>·</span>
+                <span className="text-white font-semibold">{oppData.accountName}</span>
+                <span style={{ color:B.textDim }}>·</span>
+                <span style={{ color:B.textMuted }}>{oppData.name}</span>
+                <span style={{ color:B.textDim }}>·</span>
+                <span style={{ color:B.textMuted }}>{oppData.stage}</span>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       <div className="max-w-5xl mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div>
