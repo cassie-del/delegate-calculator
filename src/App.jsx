@@ -187,6 +187,15 @@ export default function App() {
   const [freeMonths, setFreeMonths] = useState(0);
   const [manualDiscount, setManualDiscount] = useState(0);
   const [showDiscounts, setShowDiscounts] = useState(false);
+
+  // Phase 2: Quote save + approval submission state
+  const [savingQuote, setSavingQuote] = useState(false);
+  const [savedQuote, setSavedQuote] = useState(null); // { quoteId, quoteName, quoteUrl }
+  const [saveQuoteError, setSaveQuoteError] = useState(null);
+  const [submittingApproval, setSubmittingApproval] = useState(false);
+  const [approvalResult, setApprovalResult] = useState(null); // { instanceStatus }
+  const [submitApprovalError, setSubmitApprovalError] = useState(null);
+
   const fileInputRef = useRef(null);
 
   // On mount: check whether the user is already signed in via SF
@@ -439,7 +448,123 @@ export default function App() {
     setExBuilderHrs(80); setExConnectorHrs(20); setExAmplifierHrs(0); setShowAmplifier(false); setRiskBuffer("Medium");
     setCommitTerm("none"); setNewClient(false); setNewClientPct(5); setFreeMonths(0); setManualDiscount(0); setShowDiscounts(false);
     setManBuilderHrs(null); setManConnectorHrs(null); setManAmplifierHrs(null);
+    setSavedQuote(null); setSaveQuoteError(null); setApprovalResult(null); setSubmitApprovalError(null);
     if (fileInputRef.current) fileInputRef.current.value="";
+  };
+
+  // Phase 2: Save the current calculator state as a SF Quote linked to the Opp
+  const saveQuote = async () => {
+    if (!oppData?.id) { setSaveQuoteError("No Opportunity loaded — open from a SF Opportunity to save a Quote."); return; }
+    setSavingQuote(true); setSaveQuoteError(null);
+
+    // Build the long-form Pricing Detail text — full breakdown for the SF record
+    const pillarLines = PILLARS.map(p => `  ${p.label} (${p.role}): ${scores[p.id] ? SL[scores[p.id]] : "—"}`).join("\n");
+    const detail = [
+      `=== DELEGATE PRICING CALCULATOR — DETAIL ===`,
+      `Generated: ${new Date().toISOString()}`,
+      ``,
+      `ENGAGEMENT`,
+      `  Type: ${engCell?.label || "—"}`,
+      `  Tier: ${recTier?.label || "—"}`,
+      `  Scope: ${scope || "—"} · Horizon: ${time || "—"}`,
+      ``,
+      `PILLAR SCORES`,
+      pillarLines,
+      `  Average Multiplier: ${avgMult?.toFixed(3) || "—"}x`,
+      ``,
+      `INTERNAL RESOURCING (never shown to client)`,
+      `  Builder${numBuilders>1?`s (${numBuilders})`:""}: ${builderHrs} hrs/mo @ $${builderRate}/hr`,
+      `  Connector: ${connectorHrs} hrs/mo @ $${RATES.connector}/hr`,
+      `  Amplifier: ${amplifierHrs} hrs/mo @ $${RATES.amplifier}/hr`,
+      `  Total: ${totalHrs} hrs/mo · Blended rate: $${effectiveBlendedRate}/hr`,
+      ``,
+      `DISCOUNT STACK`,
+      `  Commit Term: ${commitTerm} (${commitDiscPct ? `${(commitDiscPct*100).toFixed(0)}%` : "0%"})`,
+      `  New Client: ${newClient ? `${newClientPct}%` : "—"}`,
+      `  Volume: ${volDisc ? `${(volDisc*100).toFixed(0)}%` : "0%"}`,
+      `  Manual Override: ${manualDiscount ? `${manualDiscount}%` : "0%"}`,
+      `  Free Months: ${freeMonths || 0}`,
+      `  Effective Total Discount: ${(pctDiscTotal*100).toFixed(1)}%`,
+      ``,
+      `PRICING`,
+      `  Base (hrs × rates): $${Math.round(baseInv).toLocaleString()}`,
+      `  After Multiplier (${avgMult?.toFixed(3)}x): $${Math.round(afterMult).toLocaleString()}`,
+      `  Monthly Investment (final): $${finalMonthly.toLocaleString()}`,
+      commitTerm !== "none" ? `  Term Total (${commitTerm}, ${paidMonths} paid${freeMonths>0?` + ${freeMonths} free`:""}): $${finalTermTotal?.toLocaleString()}` : null,
+      needsApproval ? `\n⚠ MANAGER APPROVAL REQUIRED (effective discount > 10%)` : null,
+    ].filter(Boolean).join("\n");
+
+    try {
+      // Compute per-role unit prices (rate × pillar multiplier × risk buffer for Execution)
+      const riskMult = isExecution ? 1 + RISK_BUFFERS[riskBuffer] : 1;
+      const mult = (avgMult || 1) * riskMult;
+      const builderUnitPrice = builderRate * mult;
+      const connectorUnitPrice = RATES.connector * mult;
+      const amplifierUnitPrice = RATES.amplifier * mult;
+
+      const r = await fetch("/api/sf/quote", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          opportunityId: oppData.id,
+          accountName: oppData.accountName,
+          engagementType: engType,
+          tierId: recTier?.id,
+          tierLabel: recTier?.label,
+          monthlyInvestment: finalMonthly,
+          totalHours: totalHrs,
+          pillarMultiplier: avgMult,
+          effectiveDiscount: pctDiscTotal,
+          commitTerm,
+          pricingDetail: detail.substring(0, 32700), // keep under SF long-text limit
+          // Per-role hours + unit prices for QuoteLineItems
+          builderHours: builderHrs,
+          builderUnitPrice,
+          connectorHours: connectorHrs,
+          connectorUnitPrice,
+          amplifierHours: amplifierHrs,
+          amplifierUnitPrice,
+        }),
+      });
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({ error: r.statusText }));
+        throw new Error(err.error || "Failed to save Quote");
+      }
+      const data = await r.json();
+      setSavedQuote(data);
+    } catch (e) {
+      setSaveQuoteError(e.message);
+    } finally {
+      setSavingQuote(false);
+    }
+  };
+
+  // Phase 2: Submit the saved Quote to the SF approval process
+  const submitForApproval = async () => {
+    if (!savedQuote?.quoteId) { setSubmitApprovalError("Save the Quote first."); return; }
+    setSubmittingApproval(true); setSubmitApprovalError(null);
+    try {
+      const r = await fetch("/api/sf/submit-approval", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          quoteId: savedQuote.quoteId,
+          comments: `Effective discount: ${(pctDiscTotal*100).toFixed(1)}%. Submitted from Pricing Calculator.`,
+        }),
+      });
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({ error: r.statusText }));
+        throw new Error(err.error || "Failed to submit for approval");
+      }
+      const data = await r.json();
+      setApprovalResult(data);
+    } catch (e) {
+      setSubmitApprovalError(e.message);
+    } finally {
+      setSubmittingApproval(false);
+    }
   };
 
   const selBtn = (active, color) => ({ border:`1px solid ${active?color:B.border}`, background:active?color+"18":B.surface, color:active?color:B.textMuted, transition:"all 0.15s" });
@@ -745,6 +870,81 @@ export default function App() {
                   {isRetainer&&commitTerm!=="none" && <div className="text-sm mt-1 font-semibold" style={{ color:B.gold }}>Pay {paidMonths}{freeMonths>0?`, get ${freeMonths} free`:""} · ${finalTermTotal?.toLocaleString()} total</div>}
                   <div className="text-xs mt-2 italic" style={{ color:B.textDim }}>Hours never shown to client</div>
                 </div>
+
+                {/* Phase 2: Salesforce Save Quote + Submit for Approval */}
+                {oppData?.id && (
+                  <div className="rounded-xl p-4 mb-4" style={{ border:`1px solid ${B.border2}`, background:B.surface2 }}>
+                    <div className="text-xs uppercase tracking-widest mb-3 flex items-center gap-2" style={{ color:B.textDim }}>
+                      <span style={{ color:B.gold }}>◆</span> Salesforce
+                    </div>
+
+                    {/* Save Quote button + result */}
+                    {!savedQuote && (
+                      <button
+                        onClick={saveQuote}
+                        disabled={savingQuote}
+                        className="w-full py-2.5 rounded-lg text-sm font-bold transition-all mb-2"
+                        style={{
+                          background: savingQuote ? B.border : B.gold,
+                          color: "#000",
+                          opacity: savingQuote ? 0.6 : 1,
+                          cursor: savingQuote ? "wait" : "pointer",
+                        }}
+                      >
+                        {savingQuote ? "Saving Quote…" : `Save Quote to ${oppData.accountName || "Opportunity"}`}
+                      </button>
+                    )}
+                    {savedQuote && (
+                      <div className="mb-2 p-3 rounded-lg" style={{ background:"#0D2318", border:"1px solid #166534" }}>
+                        <div className="text-xs font-bold mb-1" style={{ color:"#4ADE80" }}>✓ Quote saved</div>
+                        <div className="text-xs mb-2" style={{ color:B.textMuted }}>{savedQuote.quoteName}</div>
+                        <a href={savedQuote.quoteUrl} target="_blank" rel="noopener noreferrer" className="text-xs font-semibold" style={{ color:B.lightBlue }}>
+                          View in Salesforce ↗
+                        </a>
+                      </div>
+                    )}
+                    {saveQuoteError && (
+                      <div className="text-xs mb-2 p-2 rounded" style={{ color:"#FCA5A5", background:"#2A0F0A", border:"1px solid #7C2D12" }}>
+                        ⚠ {saveQuoteError}
+                      </div>
+                    )}
+
+                    {/* Submit for Approval — visible always, enabled only when discount > 10% AND quote saved */}
+                    {savedQuote && (
+                      <>
+                        {!approvalResult && (
+                          <button
+                            onClick={submitForApproval}
+                            disabled={submittingApproval || !needsApproval}
+                            className="w-full py-2.5 rounded-lg text-sm font-bold transition-all"
+                            style={{
+                              background: submittingApproval ? B.border : (needsApproval ? B.orange : B.surface),
+                              color: needsApproval ? "#000" : B.textDim,
+                              opacity: (submittingApproval || !needsApproval) ? 0.6 : 1,
+                              cursor: (submittingApproval || !needsApproval) ? "not-allowed" : "pointer",
+                              border: !needsApproval ? `1px solid ${B.border2}` : "none",
+                            }}
+                            title={!needsApproval ? "Approval only required when effective discount > 10%" : ""}
+                          >
+                            {submittingApproval ? "Submitting…" : (needsApproval ? "Submit for Approval" : "No Approval Needed")}
+                          </button>
+                        )}
+                        {approvalResult && (
+                          <div className="p-3 rounded-lg" style={{ background:"#231A0A", border:"1px solid #854D0E" }}>
+                            <div className="text-xs font-bold mb-1" style={{ color:B.gold }}>✓ Submitted for approval</div>
+                            <div className="text-xs" style={{ color:B.textMuted }}>Status: {approvalResult.instanceStatus || "Pending"}</div>
+                          </div>
+                        )}
+                        {submitApprovalError && (
+                          <div className="text-xs mt-2 p-2 rounded" style={{ color:"#FCA5A5", background:"#2A0F0A", border:"1px solid #7C2D12" }}>
+                            ⚠ {submitApprovalError}
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+                )}
+
                 <button onClick={reset} className="w-full py-2 rounded-lg text-xs transition-all" style={{ color:B.textDim, border:`1px solid ${B.border2}`, background:"transparent" }}>Reset Calculator</button>
               </div>
             )}
