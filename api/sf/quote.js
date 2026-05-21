@@ -123,7 +123,9 @@ export default async function handler(req, res) {
   ].filter(Boolean).join("\n");
 
   // Build line items — one per role with hours > 0
+  // Discount goes on each line item (Quote.Discount is calculated/read-only, rolls up from these)
   const builderCode = BUILDER_CODE_BY_ENG[engagementType] || "BLD-ST";
+  const lineDiscount = (Number(effectiveDiscount) || 0) * 100; // 0-100 percent
   const lineItems = [];
 
   if (Number(builderHours) > 0) {
@@ -132,6 +134,7 @@ export default async function handler(req, res) {
       PricebookEntryId: entriesByCode[builderCode],
       Quantity: Number(builderHours),
       UnitPrice: Number(builderUnitPrice).toFixed(4),
+      Discount: lineDiscount,
     });
   }
   if (Number(connectorHours) > 0) {
@@ -140,6 +143,7 @@ export default async function handler(req, res) {
       PricebookEntryId: entriesByCode["CON"],
       Quantity: Number(connectorHours),
       UnitPrice: Number(connectorUnitPrice).toFixed(4),
+      Discount: lineDiscount,
     });
   }
   if (Number(amplifierHours) > 0) {
@@ -148,10 +152,13 @@ export default async function handler(req, res) {
       PricebookEntryId: entriesByCode["AMP"],
       Quantity: Number(amplifierHours),
       UnitPrice: Number(amplifierUnitPrice).toFixed(4),
+      Discount: lineDiscount,
     });
   }
 
   // Build the composite tree: Quote (with custom fields) + nested QuoteLineItems
+  // Note: Quote.Discount is read-only (calculated from line items), so we don't set it here.
+  // Each line item carries the Discount, and SF rolls it up to the Quote level.
   const quoteRecord = {
     attributes: { type: "Quote", referenceId: "quote_main" },
     Name: name,
@@ -160,7 +167,6 @@ export default async function handler(req, res) {
     Status: "Draft",
     Description: descriptionLines,
     Pricebook2Id: pricebookId,
-    Discount: (Number(effectiveDiscount) || 0) * 100, // SF percent: 0-100
     Engagement_Type__c: ENGAGEMENT_LABELS[engagementType] || null,
     Tier__c: TIER_LABELS[tierId] || null,
     Monthly_Investment__c: Number(monthlyInvestment) || 0,
