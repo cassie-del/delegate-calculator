@@ -586,6 +586,7 @@ export default function App() {
           // Per-role hours + unit prices for QuoteLineItems
           builderHours: builderHrs,
           builderUnitPrice,
+          builderCount: isExecution ? 1 : numBuilders,
           connectorHours: connectorHrs,
           connectorUnitPrice,
           amplifierHours: amplifierHrs,
