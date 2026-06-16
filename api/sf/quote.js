@@ -71,6 +71,9 @@ export default async function handler(req, res) {
     pillarMultiplier,
     effectiveDiscount, // 0–1
     commitTerm,
+    contractTermMonths,
+    autoRenewal,
+    autoRenewalTerm,
     pricingDetail,
     // Per-role hours + unit prices (unit prices already include pillar multiplier and risk buffer)
     builderHours,
@@ -174,6 +177,9 @@ export default async function handler(req, res) {
     Pillar_Multiplier__c: Number(pillarMultiplier) || 1,
     Effective_Discount__c: (Number(effectiveDiscount) || 0) * 100,
     Commit_Term__c: COMMIT_LABELS[commitTerm] || "None",
+    Contract_Term_Months__c: contractTermMonths != null ? Number(contractTermMonths) : null,
+    Auto_Renewal__c: !!autoRenewal,
+    Auto_Renewal_Term__c: (autoRenewal && autoRenewalTerm != null) ? Number(autoRenewalTerm) : null,
     Pricing_Detail__c: pricingDetail || "",
   };
   if (lineItems.length > 0) {
