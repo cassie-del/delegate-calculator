@@ -78,6 +78,7 @@ export default async function handler(req, res) {
     // Per-role hours + unit prices (unit prices already include pillar multiplier and risk buffer)
     builderHours,
     builderUnitPrice,
+    builderCount,
     connectorHours,
     connectorUnitPrice,
     amplifierHours,
@@ -132,13 +133,26 @@ export default async function handler(req, res) {
   const lineItems = [];
 
   if (Number(builderHours) > 0) {
-    lineItems.push({
-      attributes: { type: "QuoteLineItem", referenceId: "li_builder" },
-      PricebookEntryId: entriesByCode[builderCode],
-      Quantity: Number(builderHours),
-      UnitPrice: Number(builderUnitPrice).toFixed(4),
-      Discount: lineDiscount,
-    });
+    // One line per builder — each line represents a person. Split the total hours across
+    // builders, giving any remainder to the earliest lines so the quantities sum exactly.
+    const count = Math.max(1, Math.floor(Number(builderCount) || 1));
+    const total = Number(builderHours);
+    const base = Math.floor(total / count);
+    let remainder = total - base * count;
+    for (let i = 0; i < count; i++) {
+      const qty = base + (remainder > 0 ? 1 : 0);
+      if (remainder > 0) remainder -= 1;
+      if (qty <= 0) continue;
+      const line = {
+        attributes: { type: "QuoteLineItem", referenceId: `li_builder_${i}` },
+        PricebookEntryId: entriesByCode[builderCode],
+        Quantity: qty,
+        UnitPrice: Number(builderUnitPrice).toFixed(4),
+        Discount: lineDiscount,
+      };
+      if (count > 1) line.Description = `Builder ${i + 1} of ${count}`;
+      lineItems.push(line);
+    }
   }
   if (Number(connectorHours) > 0) {
     lineItems.push({
