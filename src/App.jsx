@@ -28,7 +28,8 @@ const VOLUME_DISCOUNTS = [
   { label: "120–159 hrs", min: 120, max: 159, pct: 0.05 },
   { label: "160+ hrs", min: 160, max: Infinity, pct: 0.08 },
 ];
-const MAX_AUTO_DISCOUNT = 0.10;
+const MAX_AUTO_DISCOUNT = 0.12;   // total discount above this needs approval
+const RATE_FLOOR = 225;           // effective hourly rate below this needs approval
 
 const getEngagement = (scope, time) => {
   if (!scope || !time || scope === "unknown" || time === "unknown")
@@ -265,6 +266,21 @@ export default function App() {
       .finally(() => setOppLoading(false));
   }, [me?.authenticated]);
 
+  // ----- Opportunity context helpers -----
+  const oppContextText = (opp) => [
+    opp.accountName ? `Account: ${opp.accountName}` : null,
+    opp.name ? `Opportunity: ${opp.name}` : null,
+    opp.stage ? `Stage: ${opp.stage}` : null,
+    opp.amount != null ? `Amount: $${Number(opp.amount).toLocaleString()}` : null,
+    opp.closeDate ? `Close Date: ${opp.closeDate}` : null,
+    opp.ownerName ? `Owner: ${opp.ownerName}` : null,
+    opp.description ? `\nDescription:\n${opp.description}` : null,
+  ].filter(Boolean).join("\n");
+
+  // Overwrite the strategy box with opp context on demand (the on-mount effect only
+  // fills it when empty, so this is the explicit "pull it in" action).
+  const pullOppContext = () => { if (oppData) setAccountText(oppContextText(oppData)); };
+
   // Build the OAuth login URL, preserving the current opportunityId in returnTo
   const buildLoginUrl = () => {
     const returnTo = window.location.pathname + window.location.search;
@@ -356,7 +372,17 @@ export default function App() {
   const finalMonthly = Math.round(monthlyAfterPctDisc/100)*100;
   const finalTermTotal = isRetainer&&commitTerm!=="none" ? Math.round(termRevenue/100)*100 : null;
   const discountEquivPct = blendedRate>0 ? 1-(effectiveBlendedRate/blendedRate) : 0;
-  const needsApproval = (pctDiscTotal>MAX_AUTO_DISCOUNT)||(freeMonths>0&&discountEquivPct>MAX_AUTO_DISCOUNT);
+  // Approval triggers: the realized hourly rate dips below the floor, or total discount exceeds the cap.
+  // effectiveBlendedRate already folds in free months over the term, so the rate check covers give-aways too.
+  const rateBelowFloor = totalHrs>0 && effectiveBlendedRate < RATE_FLOOR;
+  const discountOverMax = pctDiscTotal > MAX_AUTO_DISCOUNT;
+  const needsApproval = rateBelowFloor || discountOverMax;
+  const approvalReasons = [];
+  if (rateBelowFloor) approvalReasons.push(`the effective hourly rate is below $${RATE_FLOOR}`);
+  if (discountOverMax) approvalReasons.push(`the total discount exceeds ${(MAX_AUTO_DISCOUNT*100).toFixed(0)}%`);
+  const approvalMsg = approvalReasons.length
+    ? (approvalReasons.join(" and ") + " and will need approval.").replace(/^the/, "The")
+    : "";
 
   const needsConnector = ["presence","clarity"].some(p => scores[p]==="M"||scores[p]==="H");
   const amplifierDepth = ["strategicGuidance","championing"].filter(p => scores[p]==="H").length;
@@ -523,7 +549,7 @@ export default function App() {
       `  After Multiplier (${avgMult?.toFixed(3)}x): $${Math.round(afterMult).toLocaleString()}`,
       `  Monthly Investment (final): $${finalMonthly.toLocaleString()}`,
       commitTerm !== "none" ? `  Term Total (${commitTerm}, ${paidMonths} paid${freeMonths>0?` + ${freeMonths} free`:""}): $${finalTermTotal?.toLocaleString()}` : null,
-      needsApproval ? `\n⚠ MANAGER APPROVAL REQUIRED (effective discount > 10%)` : null,
+      needsApproval ? `\n⚠ MANAGER APPROVAL REQUIRED: ${approvalMsg}` : null,
     ].filter(Boolean).join("\n");
 
     try {
@@ -637,26 +663,27 @@ export default function App() {
         </div>
       </div>
 
-      {/* Opportunity context banner — shows when launched from a Salesforce Opp */}
-      {(oppLoading || oppData || oppError) && (
-        <div style={{ background:B.surface2, borderBottom:`1px solid ${B.border}` }} className="px-6 py-2.5">
-          <div className="max-w-5xl mx-auto flex items-center gap-3 text-xs">
-            {oppLoading && <span style={{ color:B.textDim }}>Loading Opportunity from Salesforce…</span>}
-            {oppError && <span style={{ color:"#FCA5A5" }}>⚠ {oppError}</span>}
-            {oppData && (
-              <>
-                <span className="font-bold" style={{ color:B.gold }}>◆ Working from Salesforce Opportunity</span>
-                <span style={{ color:B.textDim }}>·</span>
-                <span className="text-white font-semibold">{oppData.accountName}</span>
-                <span style={{ color:B.textDim }}>·</span>
-                <span style={{ color:B.textMuted }}>{oppData.name}</span>
-                <span style={{ color:B.textDim }}>·</span>
-                <span style={{ color:B.textMuted }}>{oppData.stage}</span>
-              </>
-            )}
-          </div>
+      {/* Salesforce Opportunity context banner */}
+      <div style={{ background:B.surface2, borderBottom:`1px solid ${B.border}` }} className="px-6 py-2.5">
+        <div className="max-w-5xl mx-auto flex items-center gap-3 text-xs flex-wrap">
+          {oppLoading && <span style={{ color:B.textDim }}>Loading Opportunity from Salesforce…</span>}
+          {!oppLoading && oppData && (
+            <>
+              <span className="font-bold" style={{ color:B.gold }}>◆ Working from Salesforce Opportunity</span>
+              <span style={{ color:B.textDim }}>·</span>
+              <span className="text-white font-semibold">{oppData.accountName}</span>
+              <span style={{ color:B.textDim }}>·</span>
+              <span style={{ color:B.textMuted }}>{oppData.name}</span>
+              {oppData.stage && <><span style={{ color:B.textDim }}>·</span><span style={{ color:B.textMuted }}>{oppData.stage}</span></>}
+              <button onClick={pullOppContext} className="ml-2 px-2 py-0.5 rounded" style={{ color:B.lightBlue, border:`1px solid ${B.border2}` }}>Pull opp context</button>
+            </>
+          )}
+          {!oppLoading && !oppData && !oppError && (
+            <span style={{ color:B.textMuted }}>Open this calculator from a Salesforce Opportunity to create a quote against it.</span>
+          )}
+          {oppError && <span style={{ color:"#FCA5A5" }}>⚠ {oppError}</span>}
         </div>
-      )}
+      </div>
 
       <div className="max-w-5xl mx-auto px-4 py-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div>
@@ -833,7 +860,7 @@ export default function App() {
                 <div><div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color:B.textMuted }}>Manual Override %</div>
                   <div className="flex items-center gap-3"><input type="number" min={0} max={50} value={manualDiscount} onChange={e => setManualDiscount(Math.min(50,Math.max(0,parseInt(e.target.value)||0)))} className="w-20 rounded-lg px-3 py-2 text-sm text-white text-center focus:outline-none" style={{ background:B.surface2, border:`1px solid ${B.border2}` }}/><span className="text-xs" style={{ color:B.textMuted }}>% additional</span></div>
                 </div>
-                {needsApproval && <div className="p-3 rounded-lg" style={{ background:B.orange+"18", border:`1px solid ${B.orange}55` }}><div className="text-xs font-bold mb-1" style={{ color:B.orange }}>⚠ Manager Approval Required</div><div className="text-xs" style={{ color:"#FCA98A" }}>Effective discount {(discountEquivPct*100).toFixed(1)}% exceeds 10% threshold.</div></div>}
+                {needsApproval && <div className="p-3 rounded-lg" style={{ background:B.orange+"18", border:`1px solid ${B.orange}55` }}><div className="text-xs font-bold mb-1" style={{ color:B.orange }}>⚠ Manager Approval Required</div><div className="text-xs" style={{ color:"#FCA98A" }}>{approvalMsg}</div></div>}
               </div>
             )}
           </div>
@@ -852,6 +879,7 @@ export default function App() {
                     <div key={i} className="flex items-center gap-2 text-xs px-3 py-2 rounded-lg" style={{ background:done?"#14532D44":B.surface2, border:`1px solid ${done?"#166534":B.border}`, color:done?"#4ADE80":B.textDim }}>{done?"✓":"○"} {label}</div>
                   ))}
                 </div>
+                {oppData?.id && <div className="text-xs mt-4" style={{ color:B.textDim }}>Linked to {oppData.name}. The Create Quote button appears here once the diagnostic is complete.</div>}
               </div>
             ) : (
               <div>
@@ -941,12 +969,17 @@ export default function App() {
                           cursor: savingQuote ? "wait" : "pointer",
                         }}
                       >
-                        {savingQuote ? "Saving Quote…" : `Save Quote to ${oppData.accountName || "Opportunity"}`}
+                        {savingQuote ? "Creating Quote…" : "Create Quote in Salesforce"}
                       </button>
+                    )}
+                    {!savedQuote && needsApproval && (
+                      <div className="text-xs mb-2" style={{ color:B.textMuted }}>
+                        {approvalMsg} You can still create the quote now. It saves as a Draft, then submit it for approval below.
+                      </div>
                     )}
                     {savedQuote && (
                       <div className="mb-2 p-3 rounded-lg" style={{ background:"#0D2318", border:"1px solid #166534" }}>
-                        <div className="text-xs font-bold mb-1" style={{ color:"#4ADE80" }}>✓ Quote saved</div>
+                        <div className="text-xs font-bold mb-1" style={{ color:"#4ADE80" }}>✓ Quote created in Salesforce</div>
                         <div className="text-xs mb-2" style={{ color:B.textMuted }}>{savedQuote.quoteName}</div>
                         <a href={savedQuote.quoteUrl} target="_blank" rel="noopener noreferrer" className="text-xs font-semibold" style={{ color:B.lightBlue }}>
                           View in Salesforce ↗
@@ -974,7 +1007,7 @@ export default function App() {
                               cursor: (submittingApproval || !needsApproval) ? "not-allowed" : "pointer",
                               border: !needsApproval ? `1px solid ${B.border2}` : "none",
                             }}
-                            title={!needsApproval ? "Approval only required when effective discount > 10%" : ""}
+                            title={!needsApproval ? "Approval is only required when the effective rate is below $225 or total discount exceeds 12%" : ""}
                           >
                             {submittingApproval ? "Submitting…" : (needsApproval ? "Submit for Approval" : "No Approval Needed")}
                           </button>
