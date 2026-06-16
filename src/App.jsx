@@ -206,6 +206,7 @@ export default function App() {
   const [newClient, setNewClient] = useState(false);
   const [newClientPct, setNewClientPct] = useState(5);
   const [freeMonths, setFreeMonths] = useState(0);
+  const [autoRenewal, setAutoRenewal] = useState(false);
   const [manualDiscount, setManualDiscount] = useState(0);
   const [showDiscounts, setShowDiscounts] = useState(false);
   // Sticky per-discount overrides. null = follow the auto-suggestion; true/false = rep override.
@@ -364,6 +365,8 @@ export default function App() {
   const pctDiscTotal = commitDiscPct+newClientDisc+volDisc+manualDisc;
   const monthlyAfterPctDisc = monthlyInv*(1-pctDiscTotal);
   const termMonths = COMMIT_TERMS[commitTerm]||1;
+  // Contract term in months for the Quote. Only set when a commitment term is chosen.
+  const contractTermMonths = commitTerm !== "none" ? COMMIT_TERMS[commitTerm] : null;
   const paidMonths = Math.max(1, termMonths-freeMonths);
   const freeMonthValue = freeMonths>0 ? monthlyAfterPctDisc*freeMonths : 0;
   const termRevenue = isRetainer&&commitTerm!=="none" ? monthlyAfterPctDisc*paidMonths : monthlyAfterPctDisc;
@@ -504,7 +507,7 @@ export default function App() {
     setScores({}); setScope(null); setTime(null); setDuration(4); setNumBuilders(1);
     setAccountText(""); setUploadedFile(null); setUploadedFileName(""); setAiSummary(""); setAnalyzing(false);
     setExBuilderHrs(80); setExConnectorHrs(20); setExAmplifierHrs(0); setShowAmplifier(false); setRiskBuffer("Medium");
-    setCommitTerm("none"); setNewClient(false); setNewClientPct(5); setFreeMonths(0); setManualDiscount(0); setShowDiscounts(false); setDiscOverride({ commit: null, volume: null });
+    setCommitTerm("none"); setNewClient(false); setNewClientPct(5); setFreeMonths(0); setManualDiscount(0); setShowDiscounts(false); setDiscOverride({ commit: null, volume: null }); setAutoRenewal(false);
     setManBuilderHrs(null); setManConnectorHrs(null); setManAmplifierHrs(null);
     setSavedQuote(null); setSaveQuoteError(null); setApprovalResult(null); setSubmitApprovalError(null);
     if (fileInputRef.current) fileInputRef.current.value="";
@@ -549,6 +552,7 @@ export default function App() {
       `  After Multiplier (${avgMult?.toFixed(3)}x): $${Math.round(afterMult).toLocaleString()}`,
       `  Monthly Investment (final): $${finalMonthly.toLocaleString()}`,
       commitTerm !== "none" ? `  Term Total (${commitTerm}, ${paidMonths} paid${freeMonths>0?` + ${freeMonths} free`:""}): $${finalTermTotal?.toLocaleString()}` : null,
+      commitTerm !== "none" ? `  Contract Term: ${COMMIT_TERMS[commitTerm]} months${autoRenewal?` · Auto-renews for ${COMMIT_TERMS[commitTerm]} months`:` · No auto-renewal`}` : null,
       needsApproval ? `\n⚠ MANAGER APPROVAL REQUIRED: ${approvalMsg}` : null,
     ].filter(Boolean).join("\n");
 
@@ -575,6 +579,9 @@ export default function App() {
           pillarMultiplier: avgMult,
           effectiveDiscount: pctDiscTotal,
           commitTerm,
+          contractTermMonths,
+          autoRenewal,
+          autoRenewalTerm: autoRenewal ? contractTermMonths : null,
           pricingDetail: detail.substring(0, 32700), // keep under SF long-text limit
           // Per-role hours + unit prices for QuoteLineItems
           builderHours: builderHrs,
@@ -829,7 +836,7 @@ export default function App() {
                     )}
                   </div>
                   <div className="grid grid-cols-4 gap-2">{[["none","None","—"],["3mo","3 Month","5% off"],["6mo","6 Month","8% off"],["12mo","12 Month","12% off"]].map(([v,l,d]) => (
-                    <button key={v} onClick={() => { setCommitTerm(v); if(v==="none") setFreeMonths(0); }} className="rounded-lg p-2 text-center transition-all" style={selBtn(commitTerm===v, B.gold)}><div className="font-semibold text-xs">{l}</div><div className="text-xs opacity-70">{d}</div></button>
+                    <button key={v} onClick={() => { setCommitTerm(v); if(v==="none") { setFreeMonths(0); setAutoRenewal(false); } }} className="rounded-lg p-2 text-center transition-all" style={selBtn(commitTerm===v, B.gold)}><div className="font-semibold text-xs">{l}</div><div className="text-xs opacity-70">{d}</div></button>
                   ))}</div>
                 </div>
                 {isRetainer && commitTerm!=="none" && (
@@ -839,6 +846,14 @@ export default function App() {
                       <div><span className="text-xs" style={{ color:B.textMuted }}>free month{freeMonths!==1?"s":""} in {commitTerm} term</span>{freeMonths>0 && <div className="text-xs mt-0.5" style={{ color:"#4ADE80" }}>Client pays {paidMonths}, gets {termMonths}</div>}</div>
                     </div>
                     {freeMonths>0 && <div className="mt-2 p-2 rounded-lg text-xs" style={{ background:"#14532D22", border:"1px solid #16653444", color:"#4ADE80" }}>Free month value: ${Math.round(freeMonthValue).toLocaleString()}</div>}
+                  </div>
+                )}
+                {isRetainer && commitTerm!=="none" && (
+                  <div><div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color:B.textMuted }}>Auto Renewal</div>
+                    <div className="flex items-center gap-3">
+                      <button onClick={() => setAutoRenewal(!autoRenewal)} className="px-4 py-2 rounded-lg text-xs font-semibold transition-all" style={selBtn(autoRenewal, "#4ADE80")}>{autoRenewal?"✓ Auto-renews":"Off"}</button>
+                      <span className="text-xs" style={{ color:B.textMuted }}>{autoRenewal ? `Renews for another ${COMMIT_TERMS[commitTerm]} months at term end` : `Contract ends after the ${COMMIT_TERMS[commitTerm]}-month term`}</span>
+                    </div>
                   </div>
                 )}
                 <div><div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color:B.textMuted }}>New Client Discount</div>
