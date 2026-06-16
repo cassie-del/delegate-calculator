@@ -117,11 +117,25 @@ function PillarCard({ pillar, value, onChange }) {
 
 function HrsTypeInput({ label, value, onChange, rate, color, recommended, breakdownLabel }) {
   const [localVal, setLocalVal] = useState(String(value));
+  const [focused, setFocused] = useState(false);
   const diff = recommended !== undefined ? value - recommended : 0;
   const hasDiff = recommended !== undefined && diff !== 0;
-  const prevVal = React.useRef(value);
-  if (prevVal.current !== value && String(value) !== localVal) { setLocalVal(String(value)); }
-  prevVal.current = value;
+
+  // Keep the field in sync with the canonical value when it changes for any
+  // reason OTHER than the user typing (reset button, builder-count change, a
+  // recomputed recommendation). We skip the sync while the input is focused so
+  // an in-progress keystroke is never clobbered.
+  useEffect(() => {
+    if (!focused) setLocalVal(String(value));
+  }, [value, focused]);
+
+  const pushChange = (raw) => {
+    setLocalVal(raw);
+    if (raw === "") return;                    // allow a transient empty field while editing
+    const p = parseInt(raw, 10);
+    if (!isNaN(p)) onChange(Math.max(0, p));    // propagate every valid number immediately
+  };
+
   return (
     <div className="rounded-lg px-3 py-2 mb-2" style={{ background: B.surface2 }}>
       <div className="flex items-center justify-between">
@@ -131,8 +145,14 @@ function HrsTypeInput({ label, value, onChange, rate, color, recommended, breakd
         </div>
         <div className="flex items-center gap-2">
           <input type="number" min={0} max={999} value={localVal}
-            onChange={e => { setLocalVal(e.target.value); const p = parseInt(e.target.value); if (!isNaN(p)) onChange(Math.max(0, p)); }}
-            onBlur={() => { if (isNaN(parseInt(localVal)) || localVal === "") setLocalVal(String(value)); }}
+            onFocus={() => setFocused(true)}
+            onChange={e => pushChange(e.target.value)}
+            onBlur={() => {
+              setFocused(false);
+              const p = parseInt(localVal, 10);
+              if (isNaN(p) || localVal === "") { setLocalVal(String(value)); }
+              else { const clamped = Math.max(0, p); setLocalVal(String(clamped)); onChange(clamped); }
+            }}
             className="w-16 rounded-md px-2 py-1 text-sm text-white text-center font-bold focus:outline-none"
             style={{ background: B.surface, border: `1px solid ${hasDiff ? B.gold+"88" : B.border2}` }} />
           <span className="text-xs" style={{ color: B.textDim }}>hrs</span>
@@ -187,6 +207,8 @@ export default function App() {
   const [freeMonths, setFreeMonths] = useState(0);
   const [manualDiscount, setManualDiscount] = useState(0);
   const [showDiscounts, setShowDiscounts] = useState(false);
+  // Sticky per-discount overrides. null = follow the auto-suggestion; true/false = rep override.
+  const [discOverride, setDiscOverride] = useState({ commit: null, volume: null });
 
   // Phase 2: Quote save + approval submission state
   const [savingQuote, setSavingQuote] = useState(false);
@@ -309,10 +331,20 @@ export default function App() {
   const afterRisk = isExecution ? afterMult*(1+RISK_BUFFERS[riskBuffer]) : afterMult;
   const monthlyInv = afterRisk;
 
-  const commitDiscPct = commitTerm!=="none" ? COMMIT_DISCOUNTS[commitTerm] : 0;
+  const commitDiscPctRaw = commitTerm!=="none" ? COMMIT_DISCOUNTS[commitTerm] : 0;
   const newClientDisc = newClient ? newClientPct/100 : 0;
-  const volDisc = isRetainer ? (VOLUME_DISCOUNTS.find(v => totalHrs>=v.min && totalHrs<=v.max)?.pct||0) : 0;
+  const volDiscRaw = isRetainer ? (VOLUME_DISCOUNTS.find(v => totalHrs>=v.min && totalHrs<=v.max)?.pct||0) : 0;
   const manualDisc = manualDiscount/100;
+  // Volume and commit auto-apply when they have a value. A rep can switch either off and the choice
+  // sticks (auto stops re-applying) until Reset to auto. New-client and manual toggle via their own controls.
+  const discAuto = { commit: commitDiscPctRaw>0, volume: volDiscRaw>0 };
+  const commitEnabled = discOverride.commit ?? discAuto.commit;
+  const volumeEnabled = discOverride.volume ?? discAuto.volume;
+  const toggleDisc = (key, auto) => setDiscOverride(o => ({ ...o, [key]: !(o[key] ?? auto) }));
+  const resetDiscToAuto = () => setDiscOverride({ commit: null, volume: null });
+  const anyDiscOverride = discOverride.commit !== null || discOverride.volume !== null;
+  const commitDiscPct = commitEnabled ? commitDiscPctRaw : 0;
+  const volDisc = volumeEnabled ? volDiscRaw : 0;
   const pctDiscTotal = commitDiscPct+newClientDisc+volDisc+manualDisc;
   const monthlyAfterPctDisc = monthlyInv*(1-pctDiscTotal);
   const termMonths = COMMIT_TERMS[commitTerm]||1;
@@ -446,7 +478,7 @@ export default function App() {
     setScores({}); setScope(null); setTime(null); setDuration(4); setNumBuilders(1);
     setAccountText(""); setUploadedFile(null); setUploadedFileName(""); setAiSummary(""); setAnalyzing(false);
     setExBuilderHrs(80); setExConnectorHrs(20); setExAmplifierHrs(0); setShowAmplifier(false); setRiskBuffer("Medium");
-    setCommitTerm("none"); setNewClient(false); setNewClientPct(5); setFreeMonths(0); setManualDiscount(0); setShowDiscounts(false);
+    setCommitTerm("none"); setNewClient(false); setNewClientPct(5); setFreeMonths(0); setManualDiscount(0); setShowDiscounts(false); setDiscOverride({ commit: null, volume: null });
     setManBuilderHrs(null); setManConnectorHrs(null); setManAmplifierHrs(null);
     setSavedQuote(null); setSaveQuoteError(null); setApprovalResult(null); setSubmitApprovalError(null);
     if (fileInputRef.current) fileInputRef.current.value="";
@@ -757,7 +789,18 @@ export default function App() {
             </button>
             {showDiscounts && (
               <div className="mt-4 space-y-5">
-                <div><div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color:B.textMuted }}>Commitment Term</div>
+                {anyDiscOverride && (
+                  <div className="flex justify-end">
+                    <button onClick={resetDiscToAuto} className="text-xs px-2 py-1 rounded" style={{ color:B.gold, background:B.gold+"18", border:`1px solid ${B.gold}44` }}>↺ Reset to auto</button>
+                  </div>
+                )}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="text-xs font-semibold uppercase tracking-wide" style={{ color:B.textMuted }}>Commitment Term</div>
+                    {commitDiscPctRaw>0 && (
+                      <button onClick={() => toggleDisc("commit", discAuto.commit)} className="text-xs px-2 py-0.5 rounded-full transition-all" style={selBtn(commitEnabled, "#4ADE80")}>{commitEnabled?"✓ Discount on":"Discount off"}</button>
+                    )}
+                  </div>
                   <div className="grid grid-cols-4 gap-2">{[["none","None","—"],["3mo","3 Month","5% off"],["6mo","6 Month","8% off"],["12mo","12 Month","12% off"]].map(([v,l,d]) => (
                     <button key={v} onClick={() => { setCommitTerm(v); if(v==="none") setFreeMonths(0); }} className="rounded-lg p-2 text-center transition-all" style={selBtn(commitTerm===v, B.gold)}><div className="font-semibold text-xs">{l}</div><div className="text-xs opacity-70">{d}</div></button>
                   ))}</div>
@@ -777,8 +820,15 @@ export default function App() {
                     {newClient && <div className="flex items-center gap-2"><input type="number" min={0} max={20} value={newClientPct} onChange={e => setNewClientPct(Math.min(20,Math.max(0,parseInt(e.target.value)||0)))} className="w-16 rounded-lg px-2 py-1 text-sm text-white text-center focus:outline-none" style={{ background:B.surface2, border:`1px solid ${B.border2}` }}/><span className="text-xs" style={{ color:B.textMuted }}>%</span></div>}
                   </div>
                 </div>
-                {isRetainer && <div><div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color:B.textMuted }}>Volume Discount <span style={{ color:B.textDim, textTransform:"none", fontWeight:"normal" }}>(auto)</span></div>
-                  <div className="grid grid-cols-4 gap-1">{VOLUME_DISCOUNTS.map(v => { const active=totalHrs>=v.min&&totalHrs<=v.max; return <div key={v.label} className="rounded-lg p-2 text-center text-xs" style={{ border:`1px solid ${active?"#166534":B.border}`, background:active?"#14532D44":B.surface2, color:active?"#4ADE80":B.textDim }}><div className="font-semibold">{v.label}</div><div>{v.pct>0?`${v.pct*100}%`:"—"}</div>{active && <div className="text-xs mt-0.5">← current</div>}</div>; })}</div>
+                {isRetainer && <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="text-xs font-semibold uppercase tracking-wide" style={{ color:B.textMuted }}>Volume Discount <span style={{ color:B.textDim, textTransform:"none", fontWeight:"normal" }}>(auto from hours)</span></div>
+                    {volDiscRaw>0 && (
+                      <button onClick={() => toggleDisc("volume", discAuto.volume)} className="text-xs px-2 py-0.5 rounded-full transition-all" style={selBtn(volumeEnabled, "#4ADE80")}>{volumeEnabled?"✓ Applied":"Off"}</button>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-4 gap-1">{VOLUME_DISCOUNTS.map(v => { const inBand=totalHrs>=v.min&&totalHrs<=v.max; const active=inBand&&volumeEnabled; return <div key={v.label} className="rounded-lg p-2 text-center text-xs" style={{ border:`1px solid ${active?"#166534":(inBand?B.border2:B.border)}`, background:active?"#14532D44":B.surface2, color:active?"#4ADE80":(inBand?B.textMuted:B.textDim), opacity:(inBand&&!volumeEnabled)?0.5:1 }}><div className="font-semibold">{v.label}</div><div>{v.pct>0?`${v.pct*100}%`:"—"}</div>{inBand && <div className="text-xs mt-0.5">{active?"← current":"available"}</div>}</div>; })}</div>
+                  {volDiscRaw>0 && !volumeEnabled && <div className="text-xs mt-1.5" style={{ color:B.textDim }}>Volume discount qualifies at {(volDiscRaw*100).toFixed(0)}% but is switched off for this quote.</div>}
                 </div>}
                 <div><div className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color:B.textMuted }}>Manual Override %</div>
                   <div className="flex items-center gap-3"><input type="number" min={0} max={50} value={manualDiscount} onChange={e => setManualDiscount(Math.min(50,Math.max(0,parseInt(e.target.value)||0)))} className="w-20 rounded-lg px-3 py-2 text-sm text-white text-center focus:outline-none" style={{ background:B.surface2, border:`1px solid ${B.border2}` }}/><span className="text-xs" style={{ color:B.textMuted }}>% additional</span></div>
